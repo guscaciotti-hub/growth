@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2, Users, Play, Sparkles, FlaskConical } from "lucide-react";
 import { useProject } from "@/store/useProject";
 import { Badge, Button, cx } from "@/components/ui";
+import { brlFx } from "./panels/Costs";
 import { defaultScenario } from "@/lib/types";
 
 const STEPS = [
@@ -12,7 +13,8 @@ const STEPS = [
 ] as const;
 
 export function TopBar() {
-  const { bundle, phase, mode, analyze, generatePersonas, simulate } = useProject();
+  const { bundle, phase, mode, analyze, generatePersonas, simulate, usdBrl, setPanel } = useProject();
+  const spentUsd = (bundle?.costs ?? []).reduce((a, c) => a + c.usd, 0);
   if (!bundle) return null;
   const hasAnalysis = Boolean(bundle.analysis);
   const hasPersonas = bundle.personas.length >= 100;
@@ -37,6 +39,11 @@ export function TopBar() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold leading-tight">{bundle.project.name}</span>
             {mode === "demo" ? <Badge tone="later">modo demonstração</Badge> : <Badge tone="accent"><Sparkles className="mr-1 size-3" />IA ao vivo</Badge>}
+            {(bundle?.costs?.length ?? 0) > 0 && (
+              <button onClick={() => setPanel("costs")} title="Ver gastos" className="inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold num text-gold hover:bg-gold/20">
+                {brlFx(spentUsd * usdBrl.rate)}
+              </button>
+            )}
           </div>
           <div className="text-[11px] text-muted leading-tight">
             {bundle.project.input.category} · {bundle.project.input.model}{bundle.project.input.model !== "online" && bundle.project.input.location.city ? ` · ${bundle.project.input.location.city}` : ""}

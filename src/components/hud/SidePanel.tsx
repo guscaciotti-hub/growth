@@ -1,5 +1,5 @@
 "use client";
-import { LayoutDashboard, Globe2, Users, Play, FlaskConical } from "lucide-react";
+import { LayoutDashboard, Globe2, Users, Play, FlaskConical, Wallet } from "lucide-react";
 import { useProject, type PanelKey } from "@/store/useProject";
 import { cx } from "@/components/ui";
 import { OverviewPanel } from "./panels/Overview";
@@ -7,6 +7,7 @@ import { MarketPanel } from "./panels/Market";
 import { CustomersPanel } from "./panels/Customers";
 import { SimulationPanel } from "./panels/Simulation";
 import { AdjustPanel } from "./panels/Adjust";
+import { CostsPanel } from "./panels/Costs";
 
 const TABS: { key: PanelKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "overview", label: "Visão geral", icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const TABS: { key: PanelKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "customers", label: "Clientes", icon: Users },
   { key: "simulation", label: "Simulação", icon: Play },
   { key: "adjust", label: "Ajustes", icon: FlaskConical },
+  { key: "costs", label: "Gastos", icon: Wallet },
 ];
 
 export function SidePanel() {
@@ -35,6 +37,7 @@ export function SidePanel() {
         {panel === "customers" && <CustomersPanel />}
         {panel === "simulation" && <SimulationPanel />}
         {panel === "adjust" && <AdjustPanel />}
+        {panel === "costs" && <CostsPanel />}
       </div>
     </aside>
   );

@@ -50,6 +50,17 @@ export function listLocal(): ProjectListItem[] {
     .map((b) => ({ ...b.project, score: b.analysis?.data.verdict.success_score ?? null, runs: b.runs.length }));
 }
 
+/** Histórico de gastos de todos os projetos deste navegador. */
+export function allCosts(): { projectId: string; projectName: string; entry: import("./pricing").CostEntry }[] {
+  const out: { projectId: string; projectName: string; entry: import("./pricing").CostEntry }[] = [];
+  for (const id of listLocalIds()) {
+    const b = loadLocal(id);
+    if (!b) continue;
+    for (const entry of b.costs ?? []) out.push({ projectId: id, projectName: b.project.name, entry });
+  }
+  return out.sort((a, b) => b.entry.at.localeCompare(a.entry.at));
+}
+
 /** Quanto progresso um bundle tem (para escolher entre cópia local e do servidor). */
 export function progressOf(b: ProjectBundle | null): number {
   if (!b) return -1;

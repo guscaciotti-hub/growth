@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AnalysisSchema, BusinessInputSchema, PersonaSchema, ScenarioConfigSchema, SimResultSchema } from "@/lib/types";
 import { isMockMode } from "@/lib/ai/client";
+import { costUsd, type CostEntry, type Usage } from "@/lib/pricing";
 
 export const Body = {
   research: z.object({ input: BusinessInputSchema }),
@@ -29,3 +30,23 @@ export function fail(err: unknown): NextResponse {
 }
 
 export const modeInfo = () => ({ ai: isMockMode() ? "demo" : "live" });
+
+/** Monta a entrada de custo de uma chamada para o histórico do cliente. */
+export function costEntry(step: CostEntry["step"], label: string, usage: Usage): CostEntry {
+  const demo = isMockMode();
+  return {
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    step,
+    label,
+    model: usage.model,
+    calls: 1,
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    cache_read_input_tokens: usage.cache_read_input_tokens,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens,
+    web_search_requests: usage.web_search_requests,
+    usd: demo ? 0 : costUsd(usage),
+    demo,
+  };
+}

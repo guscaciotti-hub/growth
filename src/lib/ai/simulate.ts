@@ -14,13 +14,15 @@ import { anthropic, FALLBACK_BETA, MODEL_ANALYSIS, MODEL_SIM, RefusalError, isMo
 import { SIM_SYSTEM, ANALYST_SYSTEM, simulateBatchPrompt, summaryPrompt } from "./prompts";
 import { computeMetrics, metricsToText } from "../metrics";
 import { mockSimulateBatch, mockSummary } from "./mock";
+import { emptyUsage, usageOf, type Usage } from "../pricing";
 
 const BATCH = 10;
 const CONCURRENCY = 5;
 
 /** Simula um único lote de personas (chamada curta, boa para serverless). */
-export async function simulateBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<SimResult[]> {
-  return isMockMode() ? mockBatchDelay(() => mockSimulateBatch(input, analysis, personas, scenario)) : realBatch(input, analysis, personas, scenario);
+export async function simulateBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<{ results: SimResult[]; usage: Usage }> {
+  if (isMockMode()) return { results: await mockBatchDelay(() => mockSimulateBatch(input, analysis, personas, scenario)), usage: emptyUsage("demo") };
+  return realBatch(input, analysis, personas, scenario);
 }
 
 export async function runSimulation(
@@ -38,9 +40,7 @@ export async function runSimulation(
   const workers = Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
     while (next < batches.length) {
       const b = batches[next++];
-      const out = isMockMode()
-        ? await mockBatchDelay(() => mockSimulateBatch(input, analysis, b, scenario))
-        : await realBatch(input, analysis, b, scenario);
+      const { results: out } = await simulateBatch(input, analysis, b, scenario);
       results.push(...out);
       await onBatch(out);
     }
@@ -54,7 +54,7 @@ async function mockBatchDelay<T>(fn: () => T): Promise<T> {
   return fn();
 }
 
-async function realBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<SimResult[]> {
+async function realBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<{ results: SimResult[]; usage: Usage }> {
   const client = anthropic();
   const res = await client.beta.messages.parse({
     model: MODEL_SIM,
@@ -98,7 +98,7 @@ async function realBatch(input: BusinessInput, analysis: Analysis, personas: Per
       });
     }
   }
-  return out;
+  return { results: out, usage: usageOf(res, MODEL_SIM) };
 }
 
 export async function summarizeRun(
@@ -107,12 +107,12 @@ export async function summarizeRun(
   personas: Persona[],
   results: SimResult[],
   scenario: ScenarioConfig,
-): Promise<RunSummary & { metrics: RunMetrics }> {
+): Promise<{ summary: RunSummary & { metrics: RunMetrics }; usage: Usage }> {
   const price = scenario.price_override ?? input.price;
   const metrics = computeMetrics(results, personas, input, analysis, price);
   if (isMockMode()) {
     await new Promise((r) => setTimeout(r, 900));
-    return { ...mockSummary(input, analysis, metrics, scenario), metrics };
+    return { summary: { ...mockSummary(input, analysis, metrics, scenario), metrics }, usage: emptyUsage("demo") };
   }
   const byIdx = new Map(personas.map((p) => [p.idx, p]));
   const sample = [...results]
@@ -140,5 +140,5 @@ export async function summarizeRun(
   if (!res.parsed_output) throw new Error("Síntese inválida.");
   const s = res.parsed_output;
   s.success_score_after = Math.max(0, Math.min(100, Math.round(s.success_score_after)));
-  return { ...s, metrics };
+  return { summary: { ...s, metrics }, usage: usageOf(res, MODEL_ANALYSIS) };
 }

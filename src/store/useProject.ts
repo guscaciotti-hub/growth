@@ -3,9 +3,11 @@ import { create } from "zustand";
 import type { Analysis, Persona, ProjectBundle, Run, RunMetrics, RunSummary, ScenarioConfig, SimResult } from "@/lib/types";
 import { planPersonaBatches, PERSONA_COUNT } from "@/lib/plan";
 import { loadLocal, progressOf, saveLocal } from "@/lib/local";
+import type { CostEntry } from "@/lib/pricing";
+import { fetchUsdBrl, cachedUsdBrl } from "@/lib/fx";
 
 export type Phase = "idle" | "analyzing" | "personas" | "simulating";
-export type PanelKey = "overview" | "market" | "customers" | "simulation" | "adjust";
+export type PanelKey = "overview" | "market" | "customers" | "simulation" | "adjust" | "costs";
 
 export type LogEntry = { id: number; t: number; kind: "buy" | "later" | "reject" | "info"; text: string; personaIdx?: number };
 
@@ -23,6 +25,7 @@ type State = {
   activeRunId: string | null;
   panel: PanelKey;
   cameraFocus: "hq" | "overview" | number;
+  usdBrl: { rate: number; at: string | null; source: string };
   load: (id: string) => Promise<void>;
   analyze: (opts?: { skipResearch?: boolean }) => Promise<void>;
   generatePersonas: () => Promise<void>;
@@ -38,7 +41,7 @@ let logId = 0;
 const SIM_BATCH = 10;
 const SIM_CONCURRENCY = 5;
 
-async function postJSON<T>(url: string, body: unknown): Promise<T & { mode?: { ai: string } }> {
+async function postJSON<T>(url: string, body: unknown): Promise<T & { mode?: { ai: string }; cost?: CostEntry }> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   let j: { error?: string } & T;
   try {
@@ -64,9 +67,11 @@ export const useProject = create<State>((set, get) => ({
   activeRunId: null,
   panel: "overview",
   cameraFocus: "overview",
+  usdBrl: { rate: 5.5, at: null, source: "padrão" },
 
   async load(id) {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, usdBrl: cachedUsdBrl() });
+    fetchUsdBrl().then((usdBrl) => set({ usdBrl })).catch(() => undefined);
     const local = loadLocal(id);
     let server: ProjectBundle | null = null;
     let mode: "demo" | "live" = get().mode;
@@ -112,6 +117,7 @@ export const useProject = create<State>((set, get) => ({
         set({ statusMessage: "Pesquisando mercado, concorrentes e região…", progress: 0.12 });
         try {
           const r = await postJSON<{ research: string }>("/api/ai/research", { input });
+          addCost(set, r.cost);
           research = r.research;
           set({ research, ...(r.mode ? { mode: r.mode.ai === "live" ? "live" : "demo" } : {}) });
           pushLog(set, { kind: "info", text: "Pesquisa de mercado concluída." });
@@ -121,6 +127,7 @@ export const useProject = create<State>((set, get) => ({
       }
       set({ statusMessage: "Analisando mercado, preço, concorrência, ameaças e economia unitária…", progress: 0.45 });
       const a = await postJSON<{ analysis: Analysis }>("/api/ai/analyze", { input, research });
+      addCost(set, a.cost);
       const analysis = a.analysis;
       update(set, (bundle) => ({
         ...bundle,
@@ -151,6 +158,7 @@ export const useProject = create<State>((set, get) => ({
       await Promise.all(
         batches.map(async (batch) => {
           const r = await postJSON<{ personas: Persona[] }>("/api/ai/personas", { input, analysis, batch });
+          addCost(set, r.cost);
           done += r.personas.length;
           update(set, (bundle) => ({
             ...bundle,
@@ -190,6 +198,7 @@ export const useProject = create<State>((set, get) => ({
         while (next < chunks.length) {
           const chunk = chunks[next++];
           const r = await postJSON<{ results: SimResult[] }>("/api/ai/simulate", { input, analysis, personas: chunk, scenario });
+          addCost(set, r.cost);
           all.push(...r.results);
           done += chunk.length;
           update(set, (bundle) => ({
@@ -210,6 +219,7 @@ export const useProject = create<State>((set, get) => ({
       await Promise.all(workers);
       set({ statusMessage: "Sintetizando objeções, preço e veredito…", progress: 0.85 });
       const s = await postJSON<{ summary: RunSummary & { metrics: RunMetrics } }>("/api/ai/summary", { input, analysis, personas, results: all.sort((x, y) => x.persona_idx - y.persona_idx), scenario });
+      addCost(set, s.cost);
       update(set, (bundle) => ({
         ...bundle,
         runs: bundle.runs.map((x) => (x.id === runId ? { ...x, summary: s.summary, status: "done" as const, finished_at: new Date().toISOString() } : x)),
@@ -246,6 +256,11 @@ function update(set: Set, fn: (b: ProjectBundle) => ProjectBundle) {
     saveLocal(bundle);
     return { bundle };
   });
+}
+
+function addCost(set: Set, cost: CostEntry | undefined) {
+  if (!cost) return;
+  update(set, (bundle) => ({ ...bundle, costs: [...(bundle.costs ?? []), cost] }));
 }
 
 function mergeResults(prev: SimResult[], batch: SimResult[]): SimResult[] {

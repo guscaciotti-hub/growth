@@ -313,6 +313,7 @@ export type ProjectBundle = {
   analysis: { id: string; data: Analysis; research: string | null; model: string | null; created_at: string } | null;
   personas: Persona[];
   runs: Run[];
+  costs?: import("./pricing").CostEntry[];
 };
 
 export type ProjectListItem = Project & { score: number | null; runs: number };

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, Users, Play, FlaskConical, Globe2, ArrowRight } from "lucide-react";
 import { ProjectList } from "@/components/ProjectList";
+import { SpendingCard } from "@/components/SpendingCard";
 
 export default function Home() {
   return (
@@ -45,6 +46,7 @@ export default function Home() {
       <section className="mt-12">
         <ProjectList />
       </section>
+      <SpendingCard />
     </main>
   );
 }

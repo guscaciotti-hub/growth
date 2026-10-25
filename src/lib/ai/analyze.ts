@@ -2,15 +2,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { AnalysisSchema, type Analysis, type BusinessInput } from "../types";
 import { anthropic, FALLBACK_BETA, MODEL_ANALYSIS, RefusalError, textOf, isMockMode } from "./client";
+import { addUsage, emptyUsage, usageOf, type Usage } from "../pricing";
 import { ANALYST_SYSTEM, analysisPrompt, researchPrompt } from "./prompts";
 import { mockAnalysis, mockResearch } from "./mock";
 
 /** Etapa 1: pesquisa na web (concorrentes, demografia, preços, regulação). */
-export async function researchBusiness(input: BusinessInput, onStatus?: (m: string) => void): Promise<string> {
+export async function researchBusiness(input: BusinessInput, onStatus?: (m: string) => void): Promise<{ research: string; usage: Usage }> {
   if (isMockMode()) {
     await sleep(800);
-    return mockResearch(input);
+    return { research: mockResearch(input), usage: emptyUsage("demo") };
   }
+  let usage = emptyUsage(MODEL_ANALYSIS);
   const client = anthropic();
   const physical = input.model !== "online" && input.location.city;
   const tool: Anthropic.Beta.BetaWebSearchTool20260209 = {
@@ -46,6 +48,7 @@ export async function researchBusiness(input: BusinessInput, onStatus?: (m: stri
     if (res.stop_reason === "refusal") {
       throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
     }
+    usage = addUsage(usage, usageOf(res, MODEL_ANALYSIS));
     out += textOf(res.content as Array<{ type: string; text?: string }>);
     if (res.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: res.content });
@@ -54,14 +57,14 @@ export async function researchBusiness(input: BusinessInput, onStatus?: (m: stri
     }
     break;
   }
-  return out.trim();
+  return { research: out.trim(), usage };
 }
 
 /** Etapa 2: análise estruturada completa. */
-export async function analyzeBusiness(input: BusinessInput, research: string | null): Promise<Analysis> {
+export async function analyzeBusiness(input: BusinessInput, research: string | null): Promise<{ analysis: Analysis; usage: Usage }> {
   if (isMockMode()) {
     await sleep(1200);
-    return mockAnalysis(input);
+    return { analysis: mockAnalysis(input), usage: emptyUsage("demo") };
   }
   const client = anthropic();
   const res = await client.beta.messages.parse({
@@ -77,7 +80,7 @@ export async function analyzeBusiness(input: BusinessInput, research: string | n
     throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
   }
   if (!res.parsed_output) throw new Error("A análise voltou sem JSON válido. Tente novamente.");
-  return normalizeAnalysis(res.parsed_output);
+  return { analysis: normalizeAnalysis(res.parsed_output), usage: usageOf(res, MODEL_ANALYSIS) };
 }
 
 function normalizeAnalysis(a: Analysis): Analysis {
