@@ -44,3 +44,6 @@ next-env.d.ts
 /video/renders/
 /video/.hyperframes/
 /video/node_modules/
+
+# Netlify
+.netlify

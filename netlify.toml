@@ -1,0 +1,10 @@
+# Deploy no Netlify (Git CD): conecte o repositório ao site e o build roda aqui.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
