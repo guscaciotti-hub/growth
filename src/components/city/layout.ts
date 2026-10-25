@@ -10,7 +10,7 @@ export const CITY = {
   laterRadius: [9.5, 12] as const,
 };
 
-export const DISTRICT_COLORS = ["#2dd4bf", "#a78bfa", "#f472b6", "#fb923c", "#60a5fa", "#facc15"];
+export const DISTRICT_COLORS = ["#2bb3a0", "#8b7cf6", "#ec6aa6", "#f28c3b", "#3b8df2", "#e3b50f"];
 
 export type District = { name: string; index: number; cx: number; cz: number; radius: number; color: string; share: number };
 

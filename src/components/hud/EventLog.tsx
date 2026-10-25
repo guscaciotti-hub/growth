@@ -12,7 +12,7 @@ export function EventLog() {
   }, [log.length]);
   if (!log.length) return null;
   return (
-    <div className="pointer-events-auto glass absolute bottom-3 right-3 z-20 hidden w-[380px] rounded-2xl lg:block">
+    <div className="pointer-events-auto glass absolute bottom-3 right-3 z-20 hidden w-[300px] rounded-2xl lg:block">
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Acontecendo na cidade</span>
         <span className="text-[10px] text-muted">{log.length}</span>
@@ -22,7 +22,7 @@ export function EventLog() {
           <button
             key={e.id}
             onClick={() => e.personaIdx !== undefined && selectPersona(e.personaIdx)}
-            className={cx("flex w-full items-start gap-2 rounded-lg px-2 py-1 text-left text-[11.5px] leading-snug transition", e.personaIdx !== undefined ? "hover:bg-white/6" : "cursor-default")}
+            className={cx("flex w-full items-start gap-2 rounded-lg px-2 py-1 text-left text-[11.5px] leading-snug transition", e.personaIdx !== undefined ? "hover:bg-slate-900/6" : "cursor-default")}
           >
             <span className={cx("mt-1.5 size-1.5 shrink-0 rounded-full", e.kind === "buy" && "bg-buy", e.kind === "later" && "bg-later", e.kind === "reject" && "bg-reject", e.kind === "info" && "bg-accent")} />
             <span className={cx(e.kind === "info" ? "text-accent/90" : "text-fg/85")}>{e.text}</span>

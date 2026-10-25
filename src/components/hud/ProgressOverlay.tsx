@@ -6,7 +6,7 @@ export function ProgressOverlay() {
   const { phase, statusMessage, progress, error, clearError } = useProject();
   if (phase === "idle" && !error) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex justify-center px-4 lg:bottom-6">
+    <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex justify-center px-4 lg:bottom-44">
       {error ? (
         <div className="pointer-events-auto glass rise flex max-w-xl items-start gap-3 rounded-2xl border-reject/40 px-4 py-3">
           <div className="mt-0.5 size-2 shrink-0 rounded-full bg-reject" />
@@ -27,7 +27,7 @@ export function ProgressOverlay() {
             </div>
             <div className="text-xs num text-muted">{Math.round(progress * 100)}%</div>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/8">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-900/8">
             <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${Math.max(3, progress * 100)}%` }} />
           </div>
         </div>

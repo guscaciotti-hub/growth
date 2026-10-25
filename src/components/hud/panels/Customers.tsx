@@ -34,7 +34,7 @@ export function CustomersPanel() {
 
       <div className="space-y-1.5">
         {a.icp.segments.map((s, i) => (
-          <button key={s.name} onClick={() => setSeg(seg === s.name ? null : s.name)} className={cx("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition hover:bg-white/6", seg === s.name && "bg-white/8")}>
+          <button key={s.name} onClick={() => setSeg(seg === s.name ? null : s.name)} className={cx("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition hover:bg-slate-900/6", seg === s.name && "bg-slate-900/8")}>
             <span className="size-2.5 rounded-full" style={{ background: DISTRICT_COLORS[i % DISTRICT_COLORS.length] }} />
             <span className="flex-1 font-medium">{s.name}</span>
             <span className="num text-muted">{s.share_pct}%</span>
@@ -54,7 +54,7 @@ export function CustomersPanel() {
           <div className="flex items-center gap-2 text-[11px] text-muted">
             <Filter className="size-3" />
             {["compra", "depois", "nao_compra"].map((d) => (
-              <button key={d} onClick={() => setDec(dec === d ? null : d)} className={cx("rounded-full border px-2 py-0.5 transition", dec === d ? "border-white/30 bg-white/10 text-fg" : "border-white/10 hover:bg-white/6")}>
+              <button key={d} onClick={() => setDec(dec === d ? null : d)} className={cx("rounded-full border px-2 py-0.5 transition", dec === d ? "border-slate-900/30 bg-slate-900/10 text-fg" : "border-slate-900/10 hover:bg-slate-900/6")}>
                 {d === "compra" ? "compraram" : d === "depois" ? "pensando" : "recusaram"}
               </button>
             ))}
@@ -65,7 +65,7 @@ export function CustomersPanel() {
               const r = results.get(p.idx);
               return (
                 <li key={p.idx}>
-                  <button onClick={() => select(selected === p.idx ? null : p.idx)} className={cx("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition hover:bg-white/6", selected === p.idx && "bg-white/10 ring-1 ring-accent/50")}>
+                  <button onClick={() => select(selected === p.idx ? null : p.idx)} className={cx("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition hover:bg-slate-900/6", selected === p.idx && "bg-slate-900/10 ring-1 ring-accent/50")}>
                     <span className="relative size-8 shrink-0 overflow-hidden rounded-lg" style={{ background: p.avatar.shirt }}>
                       <span className="absolute left-1/2 top-1.5 size-4 -translate-x-1/2 rounded-full" style={{ background: p.avatar.skin }} />
                       <span className="absolute left-1/2 top-1 h-2 w-4 -translate-x-1/2 rounded-t-full" style={{ background: p.avatar.hair }} />

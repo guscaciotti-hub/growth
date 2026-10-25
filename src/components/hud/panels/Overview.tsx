@@ -22,7 +22,7 @@ export function OverviewPanel() {
         <Empty icon={<Search className="size-8" />} title="Seu terreno está pronto">
           Rode a análise para pesquisar mercado, concorrência, região, preço e ameaças. A sede sobe conforme o veredito.
         </Empty>
-        <div className="rounded-xl bg-white/4 p-3 text-[12.5px] text-fg/85">
+        <div className="rounded-xl bg-slate-900/4 p-3 text-[12.5px] text-fg/85">
           <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Ideia</div>
           {input.pitch}
         </div>
@@ -74,7 +74,7 @@ export function OverviewPanel() {
       <Block icon={<Wrench className="size-3.5 text-gold" />} title="Ajustes recomendados">
         <ul className="space-y-1.5">
           {(run?.summary?.adjustments ?? a.verdict.adjustments).map((adj) => (
-            <li key={adj.title} className="rounded-lg bg-white/4 p-2.5">
+            <li key={adj.title} className="rounded-lg bg-slate-900/4 p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{adj.title}</span>
                 <span className={cx("num text-[11px] font-semibold", adj.expected_score_delta >= 0 ? "text-buy" : "text-reject")}>{adj.expected_score_delta >= 0 ? "+" : ""}{adj.expected_score_delta} pts</span>
@@ -97,16 +97,16 @@ export function OverviewPanel() {
       {research && (
         <div>
           <button onClick={() => setShowResearch((v) => !v)} className="text-[11px] text-accent hover:underline">{showResearch ? "Ocultar" : "Ver"} briefing da pesquisa de mercado</button>
-          {showResearch && <pre className="scroll-thin mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-[11px] leading-relaxed text-fg/80">{research}</pre>}
+          {showResearch && <pre className="scroll-thin mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-900/5 p-3 text-[11px] leading-relaxed text-fg/80">{research}</pre>}
         </div>
       )}
 
-      <div className="rounded-xl border border-white/8 bg-white/4 p-3">
+      <div className="rounded-xl border border-slate-900/8 bg-slate-900/4 p-3">
         <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted"><Clapperboard className="size-3.5 text-accent-2" /> Vídeo do resultado</div>
         <p className="text-[12px] text-muted">Exporte os dados e renderize um filme 3D de 26s com HyperFrames (pasta <code className="text-fg/80">video/</code>): salve como <code className="text-fg/80">video/assets/data.js</code> e rode <code className="text-fg/80">npm run render</code>.</p>
         <div className="mt-2 flex gap-2">
-          <a href={`/api/projects/${bundle.project.id}/export?format=js`} download className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"><Download className="size-3.5" /> data.js</a>
-          <a href={`/api/projects/${bundle.project.id}/export?format=json`} download className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"><Download className="size-3.5" /> JSON</a>
+          <a href={`/api/projects/${bundle.project.id}/export?format=js`} download className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> data.js</a>
+          <a href={`/api/projects/${bundle.project.id}/export?format=json`} download className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> JSON</a>
         </div>
       </div>
 

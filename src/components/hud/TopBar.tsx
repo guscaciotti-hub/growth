@@ -65,7 +65,7 @@ export function TopBar() {
                 {s.label}
                 {isDone && <span className="ml-1 text-[10px] opacity-80">✓</span>}
               </Button>
-              {i < STEPS.length - 1 && <span className={cx("mx-1 h-px w-5", isDone ? "bg-buy/60" : "bg-white/10")} />}
+              {i < STEPS.length - 1 && <span className={cx("mx-1 h-px w-5", isDone ? "bg-buy/60" : "bg-slate-900/10")} />}
             </div>
           );
         })}

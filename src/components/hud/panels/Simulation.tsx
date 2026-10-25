@@ -52,7 +52,7 @@ export function SimulationPanel() {
       {bundle.runs.length > 1 && (
         <div className="flex flex-wrap gap-1">
           {bundle.runs.map((r) => (
-            <button key={r.id} onClick={() => setActiveRun(r.id)} className={cx("rounded-full border px-2.5 py-1 text-[11px] transition", r.id === run.id ? "border-accent/60 bg-accent/15 text-accent" : "border-white/10 text-muted hover:bg-white/6")}>
+            <button key={r.id} onClick={() => setActiveRun(r.id)} className={cx("rounded-full border px-2.5 py-1 text-[11px] transition", r.id === run.id ? "border-accent/60 bg-accent/15 text-accent" : "border-slate-900/10 text-muted hover:bg-slate-900/6")}>
               {r.label} {r.summary ? <span className="num opacity-80">· {pct(r.summary.metrics?.conversion_rate ?? 0)}</span> : r.status === "running" ? "…" : ""}
             </button>
           ))}
@@ -66,7 +66,7 @@ export function SimulationPanel() {
             <Stat label="Pensando" value={m.later} sub={pct(m.total ? m.later / m.total : 0)} tone="later" />
             <Stat label="Recusam" value={m.reject} sub={pct(m.total ? m.reject / m.total : 0)} tone="reject" />
           </div>
-          <div className="h-2.5 flex overflow-hidden rounded-full bg-white/6">
+          <div className="h-2.5 flex overflow-hidden rounded-full bg-slate-900/6">
             <div className="bg-buy transition-all duration-700" style={{ width: `${(m.buy / Math.max(1, m.total)) * 100}%` }} />
             <div className="bg-later transition-all duration-700" style={{ width: `${(m.later / Math.max(1, m.total)) * 100}%` }} />
             <div className="bg-reject transition-all duration-700" style={{ width: `${(m.reject / Math.max(1, m.total)) * 100}%` }} />
@@ -97,13 +97,13 @@ export function SimulationPanel() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={m.price_curve.map((p) => ({ ...p, pct: Math.round(p.buyers_pct * 100) }))} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="pc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity={0.5} /><stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} /></linearGradient>
+                  <linearGradient id="pc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0284c7" stopOpacity={0.4} /><stop offset="100%" stopColor="#0284c7" stopOpacity={0.02} /></linearGradient>
                 </defs>
-                <XAxis dataKey="price" tickFormatter={(v) => `R$${v}`} tick={{ fill: "#8b9bb4", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#8b9bb4", fontSize: 10 }} axisLine={false} tickLine={false} unit="%" />
-                <Tooltip contentStyle={{ background: "#0b1222", border: "1px solid rgba(148,163,184,.2)", borderRadius: 10, fontSize: 12 }} formatter={(v) => [`${v}%`, "aceitariam"]} labelFormatter={(l) => `Preço ${brl(Number(l))}`} />
-                <ReferenceLine x={m.price_curve.reduce((b, p) => (Math.abs(p.price - price) < Math.abs(b.price - price) ? p : b)).price} stroke="#f5c451" strokeDasharray="4 3" />
-                <Area type="monotone" dataKey="pct" stroke="#38bdf8" strokeWidth={2} fill="url(#pc)" />
+                <XAxis dataKey="price" tickFormatter={(v) => `R$${v}`} tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid rgba(17,24,39,.1)", borderRadius: 10, fontSize: 12 }} formatter={(v) => [`${v}%`, "aceitariam"]} labelFormatter={(l) => `Preço ${brl(Number(l))}`} />
+                <ReferenceLine x={m.price_curve.reduce((b, p) => (Math.abs(p.price - price) < Math.abs(b.price - price) ? p : b)).price} stroke="#ca8a04" strokeDasharray="4 3" />
+                <Area type="monotone" dataKey="pct" stroke="#0284c7" strokeWidth={2} fill="url(#pc)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -117,10 +117,10 @@ export function SimulationPanel() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={m.segments.map((s) => ({ name: s.segment, conv: Math.round((s.buy / Math.max(1, s.total)) * 100), later: Math.round((s.later / Math.max(1, s.total)) * 100) }))} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                 <XAxis type="number" hide domain={[0, 100]} />
-                <YAxis type="category" dataKey="name" width={118} tick={{ fill: "#c7d2e3", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "#0b1222", border: "1px solid rgba(148,163,184,.2)", borderRadius: 10, fontSize: 12 }} formatter={(v, n) => [`${v}%`, n === "conv" ? "compram" : "pensando"]} />
-                <Bar dataKey="conv" stackId="a" radius={[0, 0, 0, 0]}>{m.segments.map((s) => <Cell key={s.segment} fill="#34d399" />)}</Bar>
-                <Bar dataKey="later" stackId="a" radius={[0, 6, 6, 0]}>{m.segments.map((s) => <Cell key={s.segment} fill="#fbbf24" />)}</Bar>
+                <YAxis type="category" dataKey="name" width={118} tick={{ fill: "#374151", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid rgba(17,24,39,.1)", borderRadius: 10, fontSize: 12 }} formatter={(v, n) => [`${v}%`, n === "conv" ? "compram" : "pensando"]} />
+                <Bar dataKey="conv" stackId="a" radius={[0, 0, 0, 0]}>{m.segments.map((s) => <Cell key={s.segment} fill="#16a34a" />)}</Bar>
+                <Bar dataKey="later" stackId="a" radius={[0, 6, 6, 0]}>{m.segments.map((s) => <Cell key={s.segment} fill="#d97706" />)}</Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -132,7 +132,7 @@ export function SimulationPanel() {
         <Block icon={<MessageSquareWarning className="size-3.5 text-reject" />} title="Objeções mais ouvidas">
           <ul className="space-y-1.5">
             {(run.summary?.top_objections ?? m.objections.slice(0, 6).map((o) => ({ ...o, how_to_handle: "" }))).map((o) => (
-              <li key={o.objection} className="rounded-lg bg-white/4 p-2.5">
+              <li key={o.objection} className="rounded-lg bg-slate-900/4 p-2.5">
                 <div className="flex items-start justify-between gap-2"><span className="font-medium">“{o.objection}”</span><Badge tone="reject">{o.count}x</Badge></div>
                 {o.how_to_handle && <p className="mt-0.5 text-buy">→ {o.how_to_handle}</p>}
               </li>

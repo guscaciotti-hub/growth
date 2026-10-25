@@ -10,9 +10,9 @@ export function Button({ variant = "primary", size = "md", loading, className, c
   const base = "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition active:scale-[.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100";
   const sizes = { sm: "px-3 py-1.5 text-xs", md: "px-4 py-2.5 text-sm", lg: "px-6 py-3.5 text-base" }[size];
   const variants = {
-    primary: "bg-accent text-[#06111c] hover:brightness-110 shadow-[0_0_24px_rgba(56,189,248,.35)]",
-    gold: "bg-gold text-[#1a1304] hover:brightness-110 shadow-[0_0_24px_rgba(245,196,81,.35)]",
-    ghost: "bg-white/5 text-fg hover:bg-white/10 border border-white/10",
+    primary: "bg-accent text-white hover:brightness-110 shadow-[0_8px_20px_rgba(2,132,199,.28)]",
+    gold: "bg-gold text-white hover:brightness-110 shadow-[0_8px_20px_rgba(202,138,4,.28)]",
+    ghost: "bg-slate-900/5 text-fg hover:bg-slate-900/10 border border-slate-900/10",
     danger: "bg-reject/15 text-reject hover:bg-reject/25 border border-reject/30",
   }[variant];
   return (
@@ -29,7 +29,7 @@ export function Spinner({ className }: { className?: string }) {
 
 export function Badge({ children, tone = "neutral", className }: { children: ReactNode; tone?: "neutral" | "buy" | "later" | "reject" | "accent" | "gold"; className?: string }) {
   const tones = {
-    neutral: "bg-white/8 text-muted border-white/10",
+    neutral: "bg-slate-900/8 text-muted border-slate-900/10",
     buy: "bg-buy/15 text-buy border-buy/30",
     later: "bg-later/15 text-later border-later/30",
     reject: "bg-reject/15 text-reject border-reject/30",
@@ -66,7 +66,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
-const inputCls = "w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-fg placeholder:text-muted/60 outline-none focus:border-accent/60 focus:bg-white/8 focus:ring-2 focus:ring-accent/20 transition";
+const inputCls = "w-full rounded-xl border border-slate-900/10 bg-slate-900/5 px-3.5 py-2.5 text-sm text-fg placeholder:text-muted/60 outline-none focus:border-accent/60 focus:bg-slate-900/8 focus:ring-2 focus:ring-accent/20 transition";
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(inputCls, props.className)} />;
 }
@@ -82,7 +82,7 @@ export function Meter({ value, max = 5, tone = "accent", label }: { value: numbe
   return (
     <div className="flex items-center gap-2">
       {label && <span className="w-24 shrink-0 text-xs text-muted">{label}</span>}
-      <div className="h-1.5 flex-1 rounded-full bg-white/8 overflow-hidden">
+      <div className="h-1.5 flex-1 rounded-full bg-slate-900/8 overflow-hidden">
         <div className={cx("h-full rounded-full transition-all duration-700", colors)} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
       </div>
       <span className="w-8 text-right text-xs num text-muted">{Number.isInteger(value) ? value : value.toFixed(1)}</span>
@@ -98,7 +98,7 @@ export function Gauge({ value, size = 140, label, sub }: { value: number; size?:
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,.08)" strokeWidth={10} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(17,24,39,.08)" strokeWidth={10} fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -109,7 +109,7 @@ export function Gauge({ value, size = 140, label, sub }: { value: number; size?:
           fill="none"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pctv / 100)}
-          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1), stroke .6s", filter: `drop-shadow(0 0 8px ${color})` }}
+          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1), stroke .6s" }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
@@ -126,7 +126,7 @@ export function Gauge({ value, size = 140, label, sub }: { value: number; size?:
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: "buy" | "later" | "reject" | "accent" | "gold" }) {
   const color = tone ? { buy: "text-buy", later: "text-later", reject: "text-reject", accent: "text-accent", gold: "text-gold" }[tone] : "text-fg";
   return (
-    <div className="rounded-xl border border-white/8 bg-white/4 px-3 py-2.5">
+    <div className="rounded-xl border border-slate-900/8 bg-slate-900/4 px-3 py-2.5">
       <div className="text-[11px] uppercase tracking-wider text-muted">{label}</div>
       <div className={cx("mt-0.5 text-lg font-semibold num leading-tight", color)}>{value}</div>
       {sub && <div className="text-[11px] text-muted mt-0.5">{sub}</div>}

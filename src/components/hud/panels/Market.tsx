@@ -21,7 +21,7 @@ export function MarketPanel() {
           {([["TAM", a.market.tam_brl_year], ["SAM", a.market.sam_brl_year], ["SOM", a.market.som_brl_year]] as const).map(([k, v], i) => (
             <div key={k} className="flex items-center gap-2 text-[12px]">
               <span className="w-10 text-muted">{k}</span>
-              <div className="h-5 flex-1 overflow-hidden rounded-md bg-white/5">
+              <div className="h-5 flex-1 overflow-hidden rounded-md bg-slate-900/5">
                 <div className={cx("h-full rounded-md", i === 0 ? "bg-accent/30" : i === 1 ? "bg-accent/55" : "bg-accent")} style={{ width: `${Math.max(4, (v / Math.max(1, a.market.tam_brl_year)) * 100)}%` }} />
               </div>
               <span className="w-20 text-right num font-medium">{brl(v, true)}</span>
@@ -48,7 +48,7 @@ export function MarketPanel() {
       <Block icon={<Building2 className="size-3.5 text-accent-2" />} title={`Concorrência · intensidade ${a.competitive_intensity}/5`}>
         <ul className="space-y-2">
           {a.competitors.map((c, i) => (
-            <li key={`${c.name}-${i}`} className="rounded-lg bg-white/4 p-2.5">
+            <li key={`${c.name}-${i}`} className="rounded-lg bg-slate-900/4 p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{c.name}</span>
                 <div className="flex gap-1"><Badge>{c.type}</Badge><Badge tone={c.price_position === "abaixo" ? "reject" : c.price_position === "acima" ? "buy" : "neutral"}>preço {c.price_position}</Badge></div>
@@ -73,7 +73,7 @@ export function MarketPanel() {
       <Block icon={<Scale className="size-3.5 text-accent" />} title="SWOT">
         <div className="grid grid-cols-2 gap-2">
           {([["Forças", a.swot.strengths, "text-buy"], ["Fraquezas", a.swot.weaknesses, "text-reject"], ["Oportunidades", a.swot.opportunities, "text-accent"], ["Ameaças", a.swot.threats, "text-later"]] as const).map(([t, items, col]) => (
-            <div key={t} className="rounded-lg bg-white/4 p-2.5">
+            <div key={t} className="rounded-lg bg-slate-900/4 p-2.5">
               <div className={cx("mb-1 text-[11px] font-semibold uppercase tracking-wider", col)}>{t}</div>
               <ul className="space-y-0.5 text-[11.5px]">{items.map((i) => <li key={i}>• {i}</li>)}</ul>
             </div>
@@ -84,7 +84,7 @@ export function MarketPanel() {
       <Block icon={<ShieldAlert className="size-3.5 text-reject" />} title="Ameaças">
         <ul className="space-y-2">
           {a.threats.map((t) => (
-            <li key={t.title} className="rounded-lg bg-white/4 p-2.5">
+            <li key={t.title} className="rounded-lg bg-slate-900/4 p-2.5">
               <div className="flex items-center justify-between"><span className="font-medium">{t.title}</span><span className="num text-[11px] text-muted">sev {t.severity} · prob {t.probability}</span></div>
               <p className="mt-0.5 text-muted">{t.description}</p>
               <p className="mt-0.5 text-buy">Mitigar: {t.mitigation}</p>

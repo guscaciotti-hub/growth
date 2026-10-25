@@ -43,7 +43,7 @@ export function PersonaCard() {
       </div>
 
       <div className="scroll-thin max-h-[60vh] space-y-3 overflow-y-auto px-4 pb-4 text-[12.5px]">
-        <blockquote className="flex gap-2 rounded-xl bg-white/4 p-3 italic text-fg/85">
+        <blockquote className="flex gap-2 rounded-xl bg-slate-900/4 p-3 italic text-fg/85">
           <Quote className="mt-0.5 size-3.5 shrink-0 text-accent" />
           <span>{p.quote}</span>
         </blockquote>
@@ -87,7 +87,7 @@ export function PersonaCard() {
 
 function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white/4 px-2.5 py-1.5">
+    <div className="rounded-lg bg-slate-900/4 px-2.5 py-1.5">
       <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted">{icon}{label}</div>
       <div className="truncate text-[12px] font-medium">{value}</div>
     </div>

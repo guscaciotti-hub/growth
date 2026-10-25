@@ -24,7 +24,7 @@ type Agent = {
 
 const dummy = new THREE.Object3D();
 const colorTmp = new THREE.Color();
-const DECISION_COLOR: Record<Decision, string> = { compra: "#34d399", depois: "#fbbf24", nao_compra: "#fb7185" };
+const DECISION_COLOR: Record<Decision, string> = { compra: "#16a34a", depois: "#d97706", nao_compra: "#e11d48" };
 
 export function Citizens({ personas, results, districts, onPositions }: { personas: Persona[]; results: SimResult[]; districts: District[]; onPositions: (get: (idx: number) => [number, number] | null) => void }) {
   const bodies = useRef<THREE.InstancedMesh>(null);
@@ -238,10 +238,10 @@ export function Citizens({ personas, results, districts, onPositions }: { person
       </instancedMesh>
 
       {hovered && hoveredAgent && (
-        <Html position={[hoveredAgent.x, 1.9, hoveredAgent.z]} center distanceFactor={18} zIndexRange={[40, 30]} style={{ pointerEvents: "none" }}>
-          <div className="glass whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px]">
-            <div className="font-semibold text-fg">{hovered.name}, {hovered.age}</div>
-            <div className="text-muted">{hovered.occupation} · {hovered.segment}</div>
+        <Html position={[hoveredAgent.x, 1.9, hoveredAgent.z]} center zIndexRange={[40, 30]} style={{ pointerEvents: "none" }}>
+          <div className="card-float whitespace-nowrap px-2.5 py-1.5 text-[11px]">
+            <div className="font-semibold" style={{ color: "#111827" }}>{hovered.name}, {hovered.age}</div>
+            <div style={{ color: "#6b7280" }}>{hovered.occupation} · {hovered.segment}</div>
             {decisions.get(hovered.idx) && (
               <div className="mt-0.5 font-medium" style={{ color: DECISION_COLOR[decisions.get(hovered.idx)!.decision] }}>
                 {labelFor(decisions.get(hovered.idx)!.decision)}
@@ -252,8 +252,8 @@ export function Citizens({ personas, results, districts, onPositions }: { person
       )}
 
       {coins.map((c) => (
-        <Html key={c.id} position={[c.x, 1.6, c.z]} center distanceFactor={20} zIndexRange={[30, 20]} style={{ pointerEvents: "none" }}>
-          <div className="coin-pop rounded-full bg-buy/90 px-2 py-0.5 text-[11px] font-bold text-[#06111c] num shadow-[0_0_14px_rgba(52,211,153,.8)]">+{brl(c.v)}</div>
+        <Html key={c.id} position={[c.x, 1.6, c.z]} center zIndexRange={[30, 20]} style={{ pointerEvents: "none" }}>
+          <div className="coin-pop rounded-full bg-buy px-2 py-0.5 text-[11px] font-bold text-white num shadow-[0_4px_14px_rgba(22,163,74,.45)]">+{brl(c.v)}</div>
         </Html>
       ))}
     </group>

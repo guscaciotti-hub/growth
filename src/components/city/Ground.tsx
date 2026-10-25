@@ -1,84 +1,135 @@
 "use client";
-import { Grid, Html } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
-import { CITY, type District } from "./layout";
+import { CITY, hash, type District } from "./layout";
 
+const dummy = new THREE.Object3D();
+
+/** Plataforma flutuante estilo maquete: laje com grama, ruas claras e bairros pastel. */
 export function Ground({ districts, showLabels }: { districts: District[]; showLabels: boolean }) {
-  const ringPts = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    const r = 10.5;
-    for (let i = 0; i <= 64; i++) {
-      const a = (i / 64) * Math.PI * 2;
-      pts.push(new THREE.Vector3(Math.cos(a) * r, 0.03, Math.sin(a) * r));
-    }
-    return pts;
-  }, []);
-  const ringGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints(ringPts), [ringPts]);
-
+  const SIZE = 84;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[140, 140]} />
-        <meshStandardMaterial color="#0b1324" roughness={1} />
+      {/* laje */}
+      <mesh position={[0, -1.4, 0]} receiveShadow castShadow>
+        <boxGeometry args={[SIZE, 2.6, SIZE]} />
+        <meshStandardMaterial color="#e3e0d6" roughness={0.95} />
       </mesh>
-      <Grid
-        position={[0, 0, 0]}
-        args={[140, 140]}
-        cellSize={2}
-        cellThickness={0.5}
-        cellColor="#172243"
-        sectionSize={10}
-        sectionThickness={1}
-        sectionColor="#233566"
-        fadeDistance={80}
-        fadeStrength={1.5}
-        infiniteGrid
-      />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.095, 0]} receiveShadow>
+        <planeGeometry args={[SIZE - 0.4, SIZE - 0.4]} />
+        <meshStandardMaterial color="#cfe4c3" roughness={1} />
+      </mesh>
       {/* avenidas */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
-        <planeGeometry args={[2.6, 2 * CITY.edgeRadius + 8]} />
-        <meshStandardMaterial color="#121c33" roughness={0.9} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
+        <planeGeometry args={[3.2, SIZE - 4]} />
+        <meshStandardMaterial color="#dfdfd9" roughness={0.9} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[0, 0.01, 0]} receiveShadow>
-        <planeGeometry args={[2.6, 2 * CITY.edgeRadius + 8]} />
-        <meshStandardMaterial color="#121c33" roughness={0.9} />
+      <mesh rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[0, -0.08, 0]} receiveShadow>
+        <planeGeometry args={[3.2, SIZE - 4]} />
+        <meshStandardMaterial color="#dfdfd9" roughness={0.9} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
-        <ringGeometry args={[9.4, 11.6, 96]} />
-        <meshStandardMaterial color="#121c33" roughness={0.9} />
+      {/* faixas das avenidas */}
+      {[0, Math.PI / 2].map((rot) => (
+        <mesh key={rot} rotation={[-Math.PI / 2, 0, rot]} position={[0, -0.07, 0]}>
+          <planeGeometry args={[0.12, SIZE - 4]} />
+          <meshBasicMaterial color="#f7f7f2" />
+        </mesh>
+      ))}
+      {/* anel viário */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.075, 0]}>
+        <ringGeometry args={[9.4, 11.8, 96]} />
+        <meshStandardMaterial color="#dfdfd9" roughness={0.9} />
       </mesh>
-      <lineLoop geometry={ringGeo}>
-        <lineBasicMaterial color="#2b3f78" />
-      </lineLoop>
       {/* praça da sede */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]} receiveShadow>
-        <circleGeometry args={[7.6, 64]} />
-        <meshStandardMaterial color="#141f3a" roughness={0.95} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.07, 0]} receiveShadow>
+        <circleGeometry args={[7.8, 64]} />
+        <meshStandardMaterial color="#efeee8" roughness={0.95} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <ringGeometry args={[7.4, 7.65, 64]} />
-        <meshBasicMaterial color="#38bdf8" transparent opacity={0.55} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]}>
+        <ringGeometry args={[7.55, 7.8, 64]} />
+        <meshBasicMaterial color="#60a5fa" />
       </mesh>
 
       {/* bairros por segmento */}
       {districts.map((d) => (
         <group key={d.name} position={[d.cx, 0, d.cz]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.013, 0]} receiveShadow>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.07, 0]} receiveShadow>
             <circleGeometry args={[d.radius, 48]} />
-            <meshStandardMaterial color={d.color} transparent opacity={0.1} roughness={1} />
+            <meshStandardMaterial color={d.color} transparent opacity={0.28} roughness={1} />
           </mesh>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-            <ringGeometry args={[d.radius - 0.12, d.radius, 64]} />
-            <meshBasicMaterial color={d.color} transparent opacity={0.5} />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]}>
+            <ringGeometry args={[d.radius - 0.14, d.radius, 64]} />
+            <meshBasicMaterial color={d.color} />
           </mesh>
-          {showLabels && <Html position={[(d.cx / Math.hypot(d.cx, d.cz)) * (d.radius + 1.2), 0.2, (d.cz / Math.hypot(d.cx, d.cz)) * (d.radius + 1.2)]} center distanceFactor={28} zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-            <div className="whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium tracking-wide" style={{ background: "rgba(6,10,19,.7)", color: d.color, border: `1px solid ${d.color}55` }}>
-              {d.name} · {Math.round(d.share)}%
-            </div>
-          </Html>}
+          {showLabels && (
+            <Html position={[(d.cx / Math.hypot(d.cx, d.cz)) * (d.radius + 1.2), 0.2, (d.cz / Math.hypot(d.cx, d.cz)) * (d.radius + 1.2)]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+              <div className="city-tag" style={{ color: "#1f2937", borderColor: d.color }}>
+                <span className="dot" style={{ background: d.color }} /> {d.name} · {Math.round(d.share)}%
+              </div>
+            </Html>
+          )}
         </group>
       ))}
+
+      <Trees size={SIZE} districts={districts} />
+    </group>
+  );
+}
+
+/** Árvores low-poly instanciadas nas bordas e entre os bairros. */
+function Trees({ size, districts }: { size: number; districts: District[] }) {
+  const items = useMemo(() => {
+    const out: { x: number; z: number; s: number; tone: number }[] = [];
+    let i = 0;
+    while (out.length < 90 && i < 2000) {
+      i++;
+      const x = (hash(i, 21) - 0.5) * (size - 6);
+      const z = (hash(i, 22) - 0.5) * (size - 6);
+      const r = Math.hypot(x, z);
+      if (r < 13) continue; // praça e anel
+      if (Math.abs(x) < 2.6 || Math.abs(z) < 2.6) continue; // avenidas
+      if (districts.some((d) => Math.hypot(x - d.cx, z - d.cz) < d.radius + 0.8)) continue;
+      if (r > CITY.competitorRadius - 3 && r < CITY.competitorRadius + 4.5 && hash(i, 23) < 0.7) continue; // concorrentes
+      out.push({ x, z, s: 0.7 + hash(i, 24) * 0.7, tone: hash(i, 25) });
+    }
+    return out;
+  }, [size, districts]);
+  const trunkRef = (m: THREE.InstancedMesh | null) => {
+    if (!m) return;
+    items.forEach((t, i) => {
+      dummy.position.set(t.x, 0.45 * t.s, t.z);
+      dummy.scale.set(t.s, t.s, t.s);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      m.setMatrixAt(i, dummy.matrix);
+    });
+    m.instanceMatrix.needsUpdate = true;
+  };
+  const crownRef = (m: THREE.InstancedMesh | null) => {
+    if (!m) return;
+    const c = new THREE.Color();
+    items.forEach((t, i) => {
+      dummy.position.set(t.x, 1.25 * t.s, t.z);
+      dummy.scale.set(t.s, t.s * 1.1, t.s);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      m.setMatrixAt(i, dummy.matrix);
+      m.setColorAt(i, c.set(t.tone < 0.5 ? "#7fbf7a" : t.tone < 0.8 ? "#6fb36b" : "#9ccc8f"));
+    });
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  };
+  return (
+    <group>
+      <instancedMesh ref={trunkRef} args={[undefined, undefined, Math.max(1, items.length)]} castShadow>
+        <cylinderGeometry args={[0.1, 0.14, 0.9, 6]} />
+        <meshStandardMaterial color="#8b5e3c" roughness={1} />
+      </instancedMesh>
+      <instancedMesh ref={crownRef} args={[undefined, undefined, Math.max(1, items.length)]} castShadow>
+        <icosahedronGeometry args={[0.75, 0]} />
+        <meshStandardMaterial roughness={0.9} flatShading />
+      </instancedMesh>
     </group>
   );
 }

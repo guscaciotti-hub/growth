@@ -21,9 +21,9 @@ export function SidePanel() {
   const setPanel = useProject((s) => s.setPanel);
   return (
     <aside className="pointer-events-auto glass flex h-full w-full flex-col overflow-hidden rounded-2xl lg:w-[420px]">
-      <nav className="flex gap-1 border-b border-white/8 p-1.5">
+      <nav className="flex gap-1 border-b border-slate-900/8 p-1.5">
         {TABS.map((t) => (
-          <button key={t.key} onClick={() => setPanel(t.key)} className={cx("flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10.5px] font-medium transition", panel === t.key ? "bg-white/10 text-fg" : "text-muted hover:bg-white/5 hover:text-fg")}>
+          <button key={t.key} onClick={() => setPanel(t.key)} className={cx("flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10.5px] font-medium transition", panel === t.key ? "bg-slate-900/10 text-fg" : "text-muted hover:bg-slate-900/5 hover:text-fg")}>
             <t.icon className="size-4" />
             {t.label}
           </button>

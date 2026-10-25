@@ -8,12 +8,13 @@ import { SidePanel } from "@/components/hud/SidePanel";
 import { PersonaCard } from "@/components/hud/PersonaCard";
 import { EventLog } from "@/components/hud/EventLog";
 import { ProgressOverlay } from "@/components/hud/ProgressOverlay";
+import { LiveCards } from "@/components/city/LiveCards";
 import { Button, Spinner } from "@/components/ui";
 
 const CityScene = dynamic(() => import("@/components/city/CityScene"), {
   ssr: false,
   loading: () => (
-    <div className="grid h-full w-full place-items-center text-muted">
+    <div className="grid h-full w-full place-items-center bg-bg text-muted">
       <div className="flex items-center gap-2 text-sm"><Spinner /> Construindo a cidade…</div>
     </div>
   ),
@@ -52,8 +53,9 @@ export function ProjectView({ id }: { id: string }) {
         <TopBar />
         <PersonaCard />
         <EventLog />
+        <LiveCards />
         <ProgressOverlay />
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 hidden items-center gap-3 text-[10.5px] text-muted lg:flex">
+        <div className="pointer-events-none absolute left-1/2 top-[76px] z-10 hidden -translate-x-1/2 items-center gap-3 rounded-full bg-white/80 px-3 py-1 text-[10.5px] text-muted xl:flex">
           <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-buy" /> comprou</span>
           <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-later" /> vai pensar</span>
           <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-reject" /> recusou</span>

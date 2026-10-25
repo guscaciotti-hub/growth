@@ -64,13 +64,13 @@ export function AdjustPanel() {
           {CHANNELS.map((c) => {
             const on = cfg.channel_focus.includes(c);
             return (
-              <button key={c} type="button" onClick={() => setCfg({ ...cfg, channel_focus: on ? cfg.channel_focus.filter((x) => x !== c) : [...cfg.channel_focus, c] })} className={cx("rounded-full border px-2.5 py-1 text-[11px] transition", on ? "border-accent/60 bg-accent/15 text-accent" : "border-white/10 text-muted hover:bg-white/6")}>{c}</button>
+              <button key={c} type="button" onClick={() => setCfg({ ...cfg, channel_focus: on ? cfg.channel_focus.filter((x) => x !== c) : [...cfg.channel_focus, c] })} className={cx("rounded-full border px-2.5 py-1 text-[11px] transition", on ? "border-accent/60 bg-accent/15 text-accent" : "border-slate-900/10 text-muted hover:bg-slate-900/6")}>{c}</button>
             );
           })}
         </div>
       </Field>
 
-      <div className="rounded-xl bg-white/4 p-3 text-[11.5px] text-muted">
+      <div className="rounded-xl bg-slate-900/4 p-3 text-[11.5px] text-muted">
         <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider"><Badge tone="gold">prévia</Badge> o que os clientes vão ouvir</div>
         <div className="text-fg/85">{input.name} por <span className="num font-medium">{brl(price)}</span>{cfg.guarantee ? `, com ${cfg.guarantee.toLowerCase()}` : ""}{cfg.positioning ? ` — “${cfg.positioning}”` : ""}{cfg.offer_changes ? `. Mudanças: ${cfg.offer_changes.replace(/\n/g, "; ")}` : ""}</div>
       </div>

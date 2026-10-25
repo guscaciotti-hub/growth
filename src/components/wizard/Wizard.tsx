@@ -110,7 +110,7 @@ export function Wizard() {
       <ol className="mb-6 grid grid-cols-5 gap-1.5">
         {STEPS.map((s, i) => (
           <li key={s.key}>
-            <button type="button" onClick={() => i < step && setStep(i)} className={cx("flex w-full flex-col items-start gap-1 rounded-xl border p-2.5 text-left transition", i === step ? "border-accent/50 bg-accent/10" : i < step ? "border-buy/30 bg-buy/5 hover:bg-buy/10" : "border-white/8 bg-white/3 opacity-60")}>
+            <button type="button" onClick={() => i < step && setStep(i)} className={cx("flex w-full flex-col items-start gap-1 rounded-xl border p-2.5 text-left transition", i === step ? "border-accent/50 bg-accent/10" : i < step ? "border-buy/30 bg-buy/5 hover:bg-buy/10" : "border-slate-900/8 bg-slate-900/3 opacity-60")}>
               <s.icon className={cx("size-4", i === step ? "text-accent" : i < step ? "text-buy" : "text-muted")} />
               <span className="text-[11px] font-semibold leading-tight">{s.title}</span>
               <span className="hidden text-[10px] leading-tight text-muted sm:block">{s.desc}</span>
@@ -133,7 +133,7 @@ export function Wizard() {
             <Field label="Modelo" error={errors.model}>
               <div className="grid grid-cols-3 gap-2">
                 {([["fisico", "Físico", "ponto, loja, clínica"], ["online", "Online", "app, e-commerce, serviço remoto"], ["hibrido", "Híbrido", "físico + digital"]] as const).map(([v, l, d]) => (
-                  <button key={v} type="button" onClick={() => set("model", v)} className={cx("rounded-xl border p-3 text-left transition", data.model === v ? "border-accent/60 bg-accent/12" : "border-white/10 bg-white/3 hover:bg-white/6")}>
+                  <button key={v} type="button" onClick={() => set("model", v)} className={cx("rounded-xl border p-3 text-left transition", data.model === v ? "border-accent/60 bg-accent/12" : "border-slate-900/10 bg-slate-900/3 hover:bg-slate-900/6")}>
                     <div className="text-sm font-semibold">{l}</div>
                     <div className="text-[11px] text-muted">{d}</div>
                   </button>
@@ -160,7 +160,7 @@ export function Wizard() {
               <div className="flex flex-wrap gap-1.5">
                 {CHANNELS.map((c) => {
                   const on = data.acquisition_channels.includes(c);
-                  return <button key={c} type="button" onClick={() => set("acquisition_channels", on ? data.acquisition_channels.filter((x) => x !== c) : [...data.acquisition_channels, c])} className={cx("rounded-full border px-3 py-1 text-xs transition", on ? "border-accent/60 bg-accent/15 text-accent" : "border-white/10 text-muted hover:bg-white/6")}>{c}</button>;
+                  return <button key={c} type="button" onClick={() => set("acquisition_channels", on ? data.acquisition_channels.filter((x) => x !== c) : [...data.acquisition_channels, c])} className={cx("rounded-full border px-3 py-1 text-xs transition", on ? "border-accent/60 bg-accent/15 text-accent" : "border-slate-900/10 text-muted hover:bg-slate-900/6")}>{c}</button>;
                 })}
               </div>
             </Field>
@@ -207,7 +207,7 @@ export function Wizard() {
               <Field label="Lançamento em (meses)"><Input inputMode="numeric" value={data.launch_horizon_months} onChange={(e) => set("launch_horizon_months", Math.max(0, Math.round(num(e.target.value))))} /></Field>
             </div>
             {data.monthly_fixed_costs > 0 && data.price > 0 && (
-              <div className="rounded-xl bg-white/4 p-3 text-[12.5px] text-fg/85">
+              <div className="rounded-xl bg-slate-900/4 p-3 text-[12.5px] text-fg/85">
                 Prévia: com margem de contribuição de <span className="num font-medium">{brl(data.price * (1 - data.variable_cost_pct / 100))}</span> por venda, o break-even é de <span className="num font-medium">{Math.ceil(data.monthly_fixed_costs / Math.max(1, data.price * (1 - data.variable_cost_pct / 100)))}</span> vendas/mês{data.initial_investment > 0 ? <>, e o investimento cobre <span className="num font-medium">{Math.floor(data.initial_investment / data.monthly_fixed_costs)}</span> meses de custos fixos</> : null}.
               </div>
             )}
@@ -227,7 +227,7 @@ export function Wizard() {
               <Row k="Canais" v={data.acquisition_channels.join(", ") || "—"} />
               <Row k="Meta" v={data.goal_monthly_revenue ? `${brl(data.goal_monthly_revenue)}/mês` : "—"} />
             </dl>
-            <p className="rounded-xl bg-white/4 p-3 text-[12.5px] text-fg/85">{data.pitch}</p>
+            <p className="rounded-xl bg-slate-900/4 p-3 text-[12.5px] text-fg/85">{data.pitch}</p>
             {serverError && <p className="text-sm text-reject">{serverError}</p>}
           </div>
         )}
@@ -258,7 +258,7 @@ function Header({ title, sub }: { title: string; sub: string }) {
 }
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-white/6 py-1.5">
+    <div className="flex justify-between gap-3 border-b border-slate-900/6 py-1.5">
       <dt className="text-muted">{k}</dt>
       <dd className="text-right font-medium">{v}</dd>
     </div>

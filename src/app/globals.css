@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #060a13;
-  --bg-2: #0b1222;
-  --panel: rgba(12, 18, 33, 0.78);
-  --panel-border: rgba(148, 163, 184, 0.14);
-  --fg: #e6edf7;
-  --muted: #8b9bb4;
-  --accent: #38bdf8;
-  --accent-2: #a78bfa;
-  --buy: #34d399;
-  --later: #fbbf24;
-  --reject: #fb7185;
-  --gold: #f5c451;
+  --bg: #f1f0ea;
+  --bg-2: #e9e8e0;
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-border: rgba(17, 24, 39, 0.08);
+  --fg: #111827;
+  --muted: #6b7280;
+  --accent: #0284c7;
+  --accent-2: #7c3aed;
+  --buy: #16a34a;
+  --later: #d97706;
+  --reject: #e11d48;
+  --gold: #ca8a04;
 }
 
 @theme inline {
@@ -32,7 +32,7 @@
 
 html, body { height: 100%; }
 body {
-  background: radial-gradient(1200px 700px at 70% -10%, #15213f 0%, var(--bg) 55%), var(--bg);
+  background: radial-gradient(1200px 700px at 70% -10%, #ffffff 0%, var(--bg) 55%), var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
   overflow-x: hidden;
@@ -43,12 +43,26 @@ body {
   border: 1px solid var(--panel-border);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 0 12px 40px rgba(17, 24, 39, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
+.card-float {
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.12);
+}
+.city-tag {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  background: #ffffff; border: 1px solid; border-radius: 999px;
+  padding: 2px 8px; font-size: 10px; font-weight: 600;
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.10);
+}
+.city-tag .dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
+
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
-.scroll-thin { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,.25) transparent; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgba(17, 24, 39, 0.18); border-radius: 999px; }
+.scroll-thin { scrollbar-width: thin; scrollbar-color: rgba(17,24,39,.18) transparent; }
 
 @keyframes pulse-ring { 0% { transform: scale(.9); opacity: .9 } 100% { transform: scale(1.6); opacity: 0 } }
 .pulse-ring::after {
@@ -58,7 +72,7 @@ body {
 
 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
 .shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.04) 75%);
+  background: linear-gradient(90deg, rgba(17,24,39,.04) 25%, rgba(17,24,39,.10) 50%, rgba(17,24,39,.04) 75%);
   background-size: 200% 100%; animation: shimmer 1.6s linear infinite;
 }
 
@@ -66,7 +80,7 @@ body {
 .rise { animation: rise .35s ease-out both; }
 
 input, textarea, select {
-  color-scheme: dark;
+  color-scheme: light;
 }
 input[type="range"] { accent-color: var(--accent); }
 
