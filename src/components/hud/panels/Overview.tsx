@@ -19,21 +19,32 @@ export function OverviewPanel() {
   if (!a) {
     return (
       <div className="space-y-4">
-        <Empty icon={<Search className="size-8" />} title="Seu terreno está pronto">
-          Rode a análise para pesquisar mercado, concorrência, região, preço e ameaças. A sede sobe conforme o veredito.
+        <Empty icon={<Search className="size-8" />} title={input.stage === "existente" ? "Seu negócio está na cidade" : "Seu terreno está pronto"}>
+          {input.stage === "existente"
+            ? "Rode o diagnóstico: a IA pesquisa o próprio negócio, o mercado e a concorrência, compara com os seus números e aponta onde o crescimento trava."
+            : "Rode a análise para pesquisar mercado, concorrência, região, preço e ameaças. A sede sobe conforme o veredito."}
         </Empty>
         <div className="rounded-xl bg-slate-900/4 p-3 text-[12.5px] text-fg/85">
-          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Ideia</div>
+          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">{input.stage === "existente" ? "O negócio" : "Ideia"}</div>
           {input.pitch}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Stat label="Ticket" value={brl(input.price)} />
           <Stat label="Custos fixos" value={`${brl(input.monthly_fixed_costs)}/mês`} />
-          <Stat label="Investimento" value={brl(input.initial_investment)} />
-          <Stat label="Meta" value={input.goal_monthly_revenue ? `${brl(input.goal_monthly_revenue)}/mês` : "—"} />
+          {input.stage === "existente" && input.existing ? (
+            <>
+              <Stat label="Faturamento hoje" value={`${brl(input.existing.monthly_revenue)}/mês`} sub={`${input.existing.customers_per_month} clientes/mês`} />
+              <Stat label="Meta" value={input.goal_monthly_revenue ? `${brl(input.goal_monthly_revenue)}/mês` : input.existing.growth_goal || "—"} />
+            </>
+          ) : (
+            <>
+              <Stat label="Investimento" value={brl(input.initial_investment)} />
+              <Stat label="Meta" value={input.goal_monthly_revenue ? `${brl(input.goal_monthly_revenue)}/mês` : "—"} />
+            </>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => analyze()} loading={phase === "analyzing"} disabled={phase !== "idle"}>Analisar com pesquisa web</Button>
+          <Button className="flex-1" onClick={() => analyze()} loading={phase === "analyzing"} disabled={phase !== "idle"}>{input.stage === "existente" ? "Diagnosticar com pesquisa web" : "Analisar com pesquisa web"}</Button>
           <Button variant="ghost" onClick={() => analyze({ skipResearch: true })} disabled={phase !== "idle"} title="Mais rápido, sem buscar dados na web">Rápida</Button>
         </div>
       </div>
@@ -60,7 +71,7 @@ export function OverviewPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <Gauge value={score} label="Viabilidade" sub={ratingLabel[rating]} />
+        <Gauge value={score} label={input.stage === "existente" ? "Crescimento" : "Viabilidade"} sub={ratingLabel[rating]} />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold leading-snug">{run?.summary?.headline ?? a.verdict.headline}</div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">

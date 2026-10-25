@@ -14,11 +14,12 @@ export function scoreColor(s: number) {
 
 /** Sede: prédio pastel que cresce com o score, com painéis solares no telhado e janelas que acendem. */
 export function Headquarters({ project, analysis, score, pulse }: { project: Project; analysis: Analysis | null; score: number | null; pulse: boolean }) {
+  const existing = project.input.stage === "existente";
   const group = useRef<THREE.Group>(null);
   const roof = useRef<THREE.Group>(null);
   const windows = useRef<THREE.InstancedMesh>(null);
-  const targetH = analysis ? 4 + ((score ?? 40) / 100) * 12 : 0.5;
-  const cur = useRef(0.5);
+  const targetH = analysis ? 4 + ((score ?? 40) / 100) * 12 : existing ? 5 : 0.5;
+  const cur = useRef(existing ? 5 : 0.5);
   const s = CITY.hqSize;
 
   const winData = useMemo(() => {
@@ -46,7 +47,7 @@ export function Headquarters({ project, analysis, score, pulse }: { project: Pro
     if (roof.current) roof.current.position.y = 0.4 + h + 0.05;
     const t = state.clock.elapsedTime;
     if (windows.current) {
-      const litRatio = analysis ? 0.2 + ((score ?? 40) / 100) * 0.6 : 0;
+      const litRatio = analysis ? 0.2 + ((score ?? 40) / 100) * 0.6 : existing ? 0.3 : 0;
       const flicker = pulse ? (Math.sin(t * 6) + 1) * 0.08 : 0;
       winData.forEach((w, i) => {
         const visible = w.pos[1] < h - 0.4;
@@ -63,7 +64,7 @@ export function Headquarters({ project, analysis, score, pulse }: { project: Pro
     }
   });
 
-  const body = score === null ? "#c9d2e3" : score < 35 ? "#f3a3b5" : score < 55 ? "#f6c98b" : score < 75 ? "#8db9f2" : "#8fd3a9";
+  const body = score === null ? (existing ? "#8db9f2" : "#c9d2e3") : score < 35 ? "#f3a3b5" : score < 55 ? "#f6c98b" : score < 75 ? "#8db9f2" : "#8fd3a9";
 
   return (
     <group>
@@ -87,7 +88,7 @@ export function Headquarters({ project, analysis, score, pulse }: { project: Pro
           <boxGeometry args={[s + 0.3, 0.2, s + 0.3]} />
           <meshStandardMaterial color="#e8e6df" roughness={0.9} />
         </mesh>
-        {analysis &&
+        {(analysis || existing) &&
           [-1, 0, 1].flatMap((i) =>
             [-1, 1].map((j) => (
               <mesh key={`${i}${j}`} position={[i * 1.6, 0.42, j * 1.3]} rotation={[-0.35, 0, 0]} castShadow>
@@ -102,13 +103,13 @@ export function Headquarters({ project, analysis, score, pulse }: { project: Pro
         </mesh>
       </group>
 
-      {!analysis && <ConstructionSite />}
+      {!analysis && !existing && <ConstructionSite />}
 
       <Html position={[0, targetH + 2.6, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1">
           <div className="card-float px-3 py-1.5 text-center">
             <div className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#111827" }}>{project.name}</div>
-            <div className="text-[9px] uppercase tracking-widest" style={{ color: "#6b7280" }}>{analysis ? "Sede inaugurada" : "Terreno em análise"}</div>
+            <div className="text-[9px] uppercase tracking-widest" style={{ color: "#6b7280" }}>{analysis ? (existing ? "Em operação" : "Sede inaugurada") : existing ? "Em operação · sem diagnóstico" : "Terreno em análise"}</div>
           </div>
           {score !== null && (
             <div className="rounded-full px-2.5 py-0.5 text-[11px] font-bold num text-white" style={{ background: scoreColor(score) }}>

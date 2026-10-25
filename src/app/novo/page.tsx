@@ -8,8 +8,8 @@ export default function NovoPage() {
       <div className="mb-6 flex items-center gap-3">
         <Link href="/" className="glass grid size-10 place-items-center rounded-xl text-muted transition hover:text-fg" aria-label="Voltar"><ArrowLeft className="size-4" /></Link>
         <div>
-          <h1 className="text-lg font-semibold leading-tight">Fundar um novo negócio</h1>
-          <p className="text-sm text-muted">Cinco passos. Depois a IA analisa tudo e 100 clientes decidem.</p>
+          <h1 className="text-lg font-semibold leading-tight">Novo negócio na cidade</h1>
+          <p className="text-sm text-muted">Vai abrir ou já existe? Poucos passos, depois a IA analisa tudo e 100 clientes decidem.</p>
         </div>
       </div>
       <Wizard />

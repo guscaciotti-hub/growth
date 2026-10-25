@@ -18,12 +18,24 @@ export function describeBusiness(input: BusinessInput): string {
       : [input.location.neighborhood, input.location.city, input.location.state, input.location.country]
           .filter(Boolean)
           .join(", ");
+  const ex = input.stage === "existente" && input.existing ? input.existing : null;
   return `NEGÓCIO: ${input.name}
+ESTÁGIO: ${ex ? `JÁ EXISTE (${ex.months_operating} meses de operação)` : "IDEIA / PRÉ-LANÇAMENTO"}
 SEGMENTO: ${input.category}
 MODELO: ${input.model}
 LOCALIZAÇÃO: ${loc}
-IDEIA / PROPOSTA:
+${ex ? "DESCRIÇÃO DO NEGÓCIO E DA OFERTA" : "IDEIA / PROPOSTA"}:
 ${input.pitch}
+${ex ? `
+SITUAÇÃO ATUAL:
+- Faturamento mensal atual: ${brl(ex.monthly_revenue)}
+- Clientes atendidos por mês: ${ex.customers_per_month}
+- Meta de crescimento: ${ex.growth_goal || "não informada"}
+- O que já funciona: ${ex.what_works || "não informado"}
+- O que não funciona / onde trava: ${ex.what_fails || "não informado"}
+- Principais desafios hoje: ${ex.main_challenges || "não informado"}
+- Presença online (site, Instagram, Google): ${ex.online_presence || "não informada"}
+- Avaliações / reputação: ${ex.reviews || "não informada"}` : ""}
 
 PÚBLICO-ALVO DECLARADO: ${input.target_audience}
 PREÇO / TICKET MÉDIO: ${brl(input.price)} (modelo de cobrança: ${input.pricing_model})
@@ -40,10 +52,12 @@ HORIZONTE DE LANÇAMENTO: ${input.launch_horizon_months} meses`;
 
 export function researchPrompt(input: BusinessInput): string {
   const physical = input.model !== "online";
+  const existing = input.stage === "existente";
   return `Faça uma pesquisa de mercado objetiva para o negócio abaixo, usando a busca na web. Produza um briefing em português com fatos, números e fontes (URL) sempre que possível.
 
 ${describeBusiness(input)}
-
+${existing ? `
+0. O PRÓPRIO NEGÓCIO: procure "${input.name}" ${input.model !== "online" ? `em ${input.location.city}` : "na web"} (Google, Instagram, avaliações, site). Relate nota e volume de avaliações, reclamações recorrentes, elogios, presença e posicionamento percebido. Se não encontrar nada, diga que a presença online é fraca ou inexistente.` : ""}
 Pesquise e relate:
 1. Tamanho e tendência do mercado deste segmento no Brasil (números recentes, crescimento, sazonalidade).
 2. Concorrentes ${physical ? `na região (${input.location.neighborhood ? input.location.neighborhood + ", " : ""}${input.location.city} - ${input.location.state}) e` : ""} nacionais/online relevantes: nomes reais, preços praticados, posicionamento, avaliações.
@@ -56,7 +70,8 @@ Formato: seções com títulos curtos, bullets factuais, cada fato com fonte ent
 }
 
 export function analysisPrompt(input: BusinessInput, research: string | null): string {
-  return `Analise a viabilidade completa do negócio abaixo e preencha TODOS os campos do formato estruturado.
+  const existing = input.stage === "existente";
+  return `${existing ? "Faça o diagnóstico completo de crescimento do negócio JÁ EXISTENTE abaixo" : "Analise a viabilidade completa do negócio abaixo"} e preencha TODOS os campos do formato estruturado.
 
 ${describeBusiness(input)}
 
@@ -71,8 +86,17 @@ Diretrizes para campos específicos:
 - threats: 4 a 7 ameaças concretas com severidade e probabilidade.
 - barriers: barreiras de entrada reais (para o fundador e para quem vier depois).
 - icp: um perfil de cliente ideal vivo e específico, com 3 a 5 segmentos cuja soma de share_pct é 100. As objeções devem ser as que esse público realmente verbaliza.
-- verdict.success_score: probabilidade realista (0-100) de sobreviver e lucrar em 24 meses. rating: inviavel (<35), arriscado (35-54), promissor (55-74), forte (75+).
-- verdict.adjustments: 3 a 6 ajustes acionáveis ordenados por impacto, com expected_score_delta realista.`;
+${
+    existing
+      ? `- CONTEXTO DE NEGÓCIO EXISTENTE: compare o faturamento e o volume atuais com o potencial da região/mercado (SOM) e explique a lacuna. Identifique onde o funil trava (ser encontrado, confiança, conversão, ticket, recorrência/indicação) usando "o que funciona" e "o que não funciona". A pesquisa deve ter procurado o próprio negócio (avaliações, presença online): use isso como evidência.
+- unit_economics: parta dos números reais informados (faturamento, clientes/mês, ticket) e não de estimativas genéricas; realistic_monthly_revenue_12m = faturamento alcançável em 12 meses se os ajustes forem aplicados.
+- verdict.success_score: probabilidade realista (0-100) de atingir a meta de crescimento em 12 a 24 meses mantendo lucro. rating: inviavel (<35), arriscado (35-54), promissor (55-74), forte (75+).
+- verdict.headline: resuma o diagnóstico (onde está o gargalo e o tamanho da oportunidade).
+- verdict.adjustments: 3 a 6 alavancas de crescimento acionáveis, ordenadas por impacto, com expected_score_delta realista; priorize o que destrava o gargalo identificado.
+- verdict.next_steps: plano de 30/60/90 dias.`
+      : `- verdict.success_score: probabilidade realista (0-100) de sobreviver e lucrar em 24 meses. rating: inviavel (<35), arriscado (35-54), promissor (55-74), forte (75+).
+- verdict.adjustments: 3 a 6 ajustes acionáveis ordenados por impacto, com expected_score_delta realista.`
+  }`;
 }
 
 export function personaBatchPrompt(
@@ -109,8 +133,9 @@ Regras:
 
 export function offerDescription(input: BusinessInput, scenario: ScenarioConfig): string {
   const price = scenario.price_override ?? input.price;
+  const ex = input.stage === "existente" && input.existing ? input.existing : null;
   return `OFERTA APRESENTADA AO CLIENTE
-Negócio: ${input.name} (${input.category}, ${input.model}${input.model !== "online" ? ` em ${input.location.neighborhood ? input.location.neighborhood + ", " : ""}${input.location.city}` : ""})
+Negócio: ${input.name} (${input.category}, ${input.model}${input.model !== "online" ? ` em ${input.location.neighborhood ? input.location.neighborhood + ", " : ""}${input.location.city}` : ""})${ex ? ` — negócio em operação há ${ex.months_operating} meses; reputação: ${ex.reviews || "desconhecida"}; presença online: ${ex.online_presence || "fraca"}` : " — negócio novo, sem histórico"}
 Proposta: ${input.pitch}
 Preço: ${brl(price)} (${input.pricing_model})${scenario.price_override ? " [preço ajustado neste cenário]" : ""}
 Diferenciais: ${input.differentiators || "não declarados"}

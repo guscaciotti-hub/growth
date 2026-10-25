@@ -1,23 +1,30 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Lightbulb, MapPin, Tag, Wallet, Rocket, Wand2, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lightbulb, MapPin, Tag, Wallet, Rocket, Wand2, Trash2, Activity, FileJson, FileText, Check } from "lucide-react";
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui";
-import { BusinessInputSchema, emptyBusinessInput, type BusinessInput } from "@/lib/types";
+import { BusinessInputSchema, emptyBusinessInput, emptyExisting, type BusinessInput } from "@/lib/types";
 import { brl } from "@/lib/format";
 import { saveLocal } from "@/lib/local";
 
-const STEPS = [
-  { key: "idea", title: "A ideia", icon: Lightbulb, desc: "O que você quer abrir e para quem" },
-  { key: "where", title: "Onde e quem", icon: MapPin, desc: "Local, demografia e cliente ideal" },
-  { key: "offer", title: "Oferta e preço", icon: Tag, desc: "Ticket, modelo, diferenciais e concorrência" },
-  { key: "money", title: "Dinheiro", icon: Wallet, desc: "Investimento, custos e meta" },
-  { key: "review", title: "Fundar", icon: Rocket, desc: "Revise e crie a sua cidade" },
-] as const;
+type StepKey = "idea" | "current" | "where" | "offer" | "money" | "review";
+type StepDef = { key: StepKey; title: string; icon: typeof Lightbulb; desc: string };
+const STEP_IDEA: StepDef = { key: "idea", title: "O negócio", icon: Lightbulb, desc: "O que é e para quem" };
+const STEP_CURRENT: StepDef = { key: "current", title: "Situação atual", icon: Activity, desc: "Faturamento, clientes, o que trava" };
+const STEP_WHERE: StepDef = { key: "where", title: "Onde e quem", icon: MapPin, desc: "Local, demografia e cliente ideal" };
+const STEP_OFFER: StepDef = { key: "offer", title: "Oferta e preço", icon: Tag, desc: "Ticket, modelo, diferenciais e concorrência" };
+const STEP_MONEY: StepDef = { key: "money", title: "Dinheiro", icon: Wallet, desc: "Investimento, custos e meta" };
+const STEP_REVIEW_NEW: StepDef = { key: "review", title: "Fundar", icon: Rocket, desc: "Revise e crie a sua cidade" };
+const STEP_REVIEW_EX: StepDef = { key: "review", title: "Entrar na cidade", icon: Rocket, desc: "Revise e rode o diagnóstico" };
+const stepsFor = (stage: BusinessInput["stage"]): StepDef[] =>
+  stage === "existente" ? [STEP_IDEA, STEP_CURRENT, STEP_WHERE, STEP_OFFER, STEP_MONEY, STEP_REVIEW_EX] : [STEP_IDEA, STEP_WHERE, STEP_OFFER, STEP_MONEY, STEP_REVIEW_NEW];
+const STEPS = stepsFor("existente"); // comprimento máximo, usado só para limitar o rascunho
 
 const CHANNELS = ["Instagram", "TikTok", "Google", "Indicação", "WhatsApp", "Facebook Ads", "Parcerias locais", "Ponto físico / rua", "Marketplace", "LinkedIn", "YouTube", "Eventos"];
 
 const EXAMPLE: BusinessInput = {
+  stage: "ideia",
+  existing: null,
   name: "Café da Esquina Studio",
   pitch: "Cafeteria de especialidade com espaço de coworking no bairro: café de origem controlada, assinatura mensal com cafés ilimitados e mesa garantida para quem trabalha remoto. Eventos semanais de networking para freelancers e pequenos empresários da região.",
   category: "Cafeteria / coworking",
@@ -94,22 +101,32 @@ export function Wizard() {
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const physical = data.model !== "online";
+  const existing = data.stage === "existente";
+  const steps = useMemo(() => stepsFor(data.stage), [data.stage]);
+  const cur = steps[Math.min(step, steps.length - 1)];
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importMsg, setImportMsg] = useState<string | null>(null);
 
   const set = <K extends keyof BusinessInput>(k: K, v: BusinessInput[K]) => setData((d) => ({ ...d, [k]: v }));
   const setLoc = (k: keyof BusinessInput["location"], v: string) => setData((d) => ({ ...d, location: { ...d.location, [k]: v } }));
+  const setEx = <K extends keyof NonNullable<BusinessInput["existing"]>>(k: K, v: NonNullable<BusinessInput["existing"]>[K]) =>
+    setData((d) => ({ ...d, existing: { ...(d.existing ?? emptyExisting()), [k]: v } }));
+  const setStage = (stage: BusinessInput["stage"]) => setData((d) => ({ ...d, stage, existing: stage === "existente" ? (d.existing ?? emptyExisting()) : null }));
 
-  const stepFields: Record<number, (keyof BusinessInput | "location.city")[]> = useMemo(
+  const stepFields: Record<StepKey, string[]> = useMemo(
     () => ({
-      0: ["name", "category", "pitch", "model"],
-      1: physical ? ["location.city", "target_audience"] : ["target_audience"],
-      2: ["price", "pricing_model"],
-      3: ["initial_investment", "monthly_fixed_costs", "variable_cost_pct", "team_size"],
-      4: [],
+      idea: ["name", "category", "pitch", "model"],
+      current: ["existing.monthly_revenue", "existing.customers_per_month", "existing.months_operating"],
+      where: physical ? ["location.city", "target_audience"] : ["target_audience"],
+      offer: ["price", "pricing_model"],
+      money: ["initial_investment", "monthly_fixed_costs", "variable_cost_pct", "team_size"],
+      review: [],
     }),
     [physical],
   );
 
-  const validateStep = (s: number): boolean => {
+  const validateStep = (key: StepKey): boolean => {
     const res = BusinessInputSchema.safeParse(data);
     const errs: Errors = {};
     if (!res.success) {
@@ -119,21 +136,43 @@ export function Wizard() {
       }
     }
     if (physical && !data.location.city.trim()) errs["location.city"] = "Informe a cidade";
+    if (existing && (data.existing?.monthly_revenue ?? 0) <= 0) errs["existing.monthly_revenue"] = "Informe o faturamento atual (aproximado serve)";
     const relevant: Errors = {};
-    for (const f of stepFields[s]) if (errs[f]) relevant[f] = errs[f];
+    for (const f of stepFields[key]) if (errs[f]) relevant[f] = errs[f];
     setErrors(relevant);
     return Object.keys(relevant).length === 0;
   };
 
   const next = () => {
-    if (!validateStep(step)) return;
-    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    if (!validateStep(cur.key)) return;
+    setStep((s) => Math.min(steps.length - 1, s + 1));
+  };
+
+  const importJson = () => {
+    try {
+      const raw = importText.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+      const j = JSON.parse(raw);
+      const merged: BusinessInput = { ...emptyBusinessInput(), ...j, location: { ...emptyBusinessInput().location, ...(j.location ?? {}) }, existing: j.stage === "existente" ? { ...emptyExisting(), ...(j.existing ?? {}) } : null };
+      const res = BusinessInputSchema.safeParse(merged);
+      if (!res.success) {
+        setImportMsg(`JSON lido, mas com campos inválidos: ${res.error.issues.slice(0, 3).map((i) => `${i.path.join(".")} (${i.message})`).join("; ")}. Corrija e tente de novo.`);
+        setData(merged);
+        return;
+      }
+      setData(res.data);
+      setImportMsg(null);
+      setImportOpen(false);
+      setStep(stepsFor(res.data.stage).length - 1);
+    } catch {
+      setImportMsg("Não consegui ler esse JSON. Cole exatamente o bloco que o Claude devolveu.");
+    }
   };
 
   const submit = async () => {
-    for (let s = 0; s < 4; s++) {
-      if (!validateStep(s)) {
-        setStep(s);
+    for (const st of steps) {
+      if (st.key === "review") continue;
+      if (!validateStep(st.key)) {
+        setStep(steps.indexOf(st));
         return;
       }
     }
@@ -175,8 +214,8 @@ export function Wizard() {
           <button type="button" onClick={clearDraft} className="inline-flex items-center gap-1 text-muted hover:text-reject"><Trash2 className="size-3.5" /> Começar do zero</button>
         </div>
       )}
-      <ol className="mb-6 grid grid-cols-5 gap-1.5">
-        {STEPS.map((s, i) => (
+      <ol className="mb-6 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+        {steps.map((s, i) => (
           <li key={s.key}>
             <button type="button" onClick={() => i < step && setStep(i)} className={cx("flex w-full flex-col items-start gap-1 rounded-xl border p-2.5 text-left transition", i === step ? "border-accent/50 bg-accent/10" : i < step ? "border-buy/30 bg-buy/5 hover:bg-buy/10" : "border-slate-900/8 bg-slate-900/3 opacity-60")}>
               <s.icon className={cx("size-4", i === step ? "text-accent" : i < step ? "text-buy" : "text-muted")} />
@@ -188,15 +227,26 @@ export function Wizard() {
       </ol>
 
       <div className="glass rise rounded-2xl p-5 sm:p-7" key={step}>
-        {step === 0 && (
+        {cur.key === "idea" && (
           <div className="space-y-4">
-            <Header title="Qual é a ideia?" sub="Descreva como se estivesse contando para um sócio. Quanto mais específico, melhor a análise." />
+            <Header title={existing ? "Sobre o negócio" : "Qual é a ideia?"} sub={existing ? "Descreva o negócio como ele funciona hoje: o que vende, para quem, como atende." : "Descreva como se estivesse contando para um sócio. Quanto mais específico, melhor a análise."} />
+            <div>
+              <div className="mb-1.5 text-sm font-medium text-fg/90">Esse negócio…</div>
+              <div className="grid grid-cols-2 gap-2">
+                {([["ideia", "Vou abrir", "ideia ou pré-lançamento: a análise diz se vale abrir"], ["existente", "Já existe", "diagnóstico: onde trava e como crescer"]] as const).map(([v, l, d]) => (
+                  <button key={v} type="button" onClick={() => setStage(v)} className={cx("rounded-xl border p-3 text-left transition", data.stage === v ? "border-accent/60 bg-accent/12" : "border-slate-900/10 bg-slate-900/3 hover:bg-slate-900/6")}>
+                    <div className="text-sm font-semibold">{l}</div>
+                    <div className="text-[11px] text-muted">{d}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome do negócio" error={errors.name}><Input value={data.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex.: Café da Esquina" /></Field>
               <Field label="Segmento" error={errors.category}><Input value={data.category} onChange={(e) => set("category", e.target.value)} placeholder="Ex.: cafeteria, clínica, SaaS, loja de roupas" /></Field>
             </div>
-            <Field label="A ideia em detalhes" hint="o que vende, como funciona, por que alguém compraria" error={errors.pitch}>
-              <Textarea value={data.pitch} onChange={(e) => set("pitch", e.target.value)} rows={5} placeholder="Ex.: Cafeteria de especialidade com coworking, assinatura mensal..." />
+            <Field label={existing ? "O negócio em detalhes" : "A ideia em detalhes"} hint="o que vende, como funciona, por que alguém compraria" error={errors.pitch}>
+              <Textarea value={data.pitch} onChange={(e) => set("pitch", e.target.value)} rows={5} placeholder={existing ? "Ex.: Clínica odontológica com 2 cadeiras, foco em estética e implantes, atende particular e 2 convênios..." : "Ex.: Cafeteria de especialidade com coworking, assinatura mensal..."} />
             </Field>
             <Field label="Modelo" error={errors.model}>
               <div className="grid grid-cols-3 gap-2">
@@ -211,9 +261,30 @@ export function Wizard() {
           </div>
         )}
 
-        {step === 1 && (
+        {cur.key === "current" && data.existing && (
           <div className="space-y-4">
-            <Header title={physical ? "Onde vai ficar e quem é o cliente?" : "Quem é o cliente?"} sub={physical ? "A região define renda, fluxo e concorrência num raio de poucos quilômetros." : "Negócio online: a geografia pesa menos, o perfil pesa tudo."} />
+            <Header title="Como está hoje?" sub="Números aproximados servem. É daqui que sai o diagnóstico: onde o funil trava e qual o tamanho da oportunidade." />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Tempo de operação (meses)" error={errors["existing.months_operating"]}><Input inputMode="numeric" value={data.existing.months_operating} onChange={(e) => setEx("months_operating", Math.max(0, Math.round(num(e.target.value))))} /></Field>
+              <Field label="Faturamento mensal (R$)" error={errors["existing.monthly_revenue"]}><Input inputMode="numeric" value={data.existing.monthly_revenue || ""} onChange={(e) => setEx("monthly_revenue", num(e.target.value))} placeholder="45000" /></Field>
+              <Field label="Clientes atendidos / mês" error={errors["existing.customers_per_month"]}><Input inputMode="numeric" value={data.existing.customers_per_month || ""} onChange={(e) => setEx("customers_per_month", num(e.target.value))} placeholder="120" /></Field>
+            </div>
+            <Field label="Meta de crescimento" hint="para onde quer chegar e em quanto tempo"><Input value={data.existing.growth_goal} onChange={(e) => setEx("growth_goal", e.target.value)} placeholder="Ex.: dobrar o faturamento em 12 meses; lotar a agenda; abrir 2ª unidade" /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="O que já funciona bem"><Textarea value={data.existing.what_works} onChange={(e) => setEx("what_works", e.target.value)} rows={3} placeholder="Ex.: indicação de pacientes, atendimento, localização" /></Field>
+              <Field label="O que não funciona / onde trava"><Textarea value={data.existing.what_fails} onChange={(e) => setEx("what_fails", e.target.value)} rows={3} placeholder="Ex.: Instagram não gera agendamento, muitos orçamentos sem fechar" /></Field>
+            </div>
+            <Field label="Principais desafios hoje"><Textarea value={data.existing.main_challenges} onChange={(e) => setEx("main_challenges", e.target.value)} rows={2} placeholder="Ex.: concorrência de rede com preço baixo, dependência do dono, agenda ociosa à tarde" /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Presença online" hint="site, Instagram, Google, anúncios"><Input value={data.existing.online_presence} onChange={(e) => setEx("online_presence", e.target.value)} placeholder="Ex.: Instagram 3,2 mil seguidores, sem site, Google sem anúncios" /></Field>
+              <Field label="Avaliações / reputação"><Input value={data.existing.reviews} onChange={(e) => setEx("reviews", e.target.value)} placeholder="Ex.: Google 4,8 (86 avaliações), reclamações sobre espera" /></Field>
+            </div>
+          </div>
+        )}
+
+        {cur.key === "where" && (
+          <div className="space-y-4">
+            <Header title={physical ? (existing ? "Onde fica e quem é o cliente?" : "Onde vai ficar e quem é o cliente?") : "Quem é o cliente?"} sub={physical ? "A região define renda, fluxo e concorrência num raio de poucos quilômetros." : "Negócio online: a geografia pesa menos, o perfil pesa tudo."} />
             {physical && (
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Cidade" error={errors["location.city"]}><Input value={data.location.city} onChange={(e) => setLoc("city", e.target.value)} placeholder="Curitiba" /></Field>
@@ -235,7 +306,7 @@ export function Wizard() {
           </div>
         )}
 
-        {step === 2 && (
+        {cur.key === "offer" && (
           <div className="space-y-4">
             <Header title="Oferta e preço" sub="O preço é a variável que mais vamos testar com os 100 clientes." />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -256,11 +327,11 @@ export function Wizard() {
           </div>
         )}
 
-        {step === 3 && (
+        {cur.key === "money" && (
           <div className="space-y-4">
-            <Header title="Dinheiro" sub="Com isso calculamos break-even, runway e quantos clientes por mês você precisa." />
+            <Header title="Dinheiro" sub={existing ? "Custos atuais e quanto está disposto a investir para crescer." : "Com isso calculamos break-even, runway e quantos clientes por mês você precisa."} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Investimento inicial (R$)" error={errors.initial_investment}><Input inputMode="numeric" value={data.initial_investment || ""} onChange={(e) => set("initial_investment", num(e.target.value))} placeholder="180000" /></Field>
+              <Field label={existing ? "Investimento disponível para crescer (R$)" : "Investimento inicial (R$)"} error={errors.initial_investment}><Input inputMode="numeric" value={data.initial_investment || ""} onChange={(e) => set("initial_investment", num(e.target.value))} placeholder="180000" /></Field>
               <Field label="Custos fixos mensais (R$)" hint="aluguel, equipe, software" error={errors.monthly_fixed_costs}><Input inputMode="numeric" value={data.monthly_fixed_costs || ""} onChange={(e) => set("monthly_fixed_costs", num(e.target.value))} placeholder="22000" /></Field>
               <Field label="Custo variável (% do preço)" hint="insumos, taxas, comissões" error={errors.variable_cost_pct}>
                 <div className="flex items-center gap-3"><input type="range" min={0} max={95} value={data.variable_cost_pct} onChange={(e) => set("variable_cost_pct", Number(e.target.value))} className="flex-1" /><span className="w-12 text-right num text-sm">{data.variable_cost_pct}%</span></div>
@@ -272,7 +343,7 @@ export function Wizard() {
                 </Select>
               </Field>
               <Field label="Meta de faturamento mensal (R$)" hint="opcional"><Input inputMode="numeric" value={data.goal_monthly_revenue || ""} onChange={(e) => set("goal_monthly_revenue", num(e.target.value))} placeholder="60000" /></Field>
-              <Field label="Lançamento em (meses)"><Input inputMode="numeric" value={data.launch_horizon_months} onChange={(e) => set("launch_horizon_months", Math.max(0, Math.round(num(e.target.value))))} /></Field>
+              {!existing && <Field label="Lançamento em (meses)"><Input inputMode="numeric" value={data.launch_horizon_months} onChange={(e) => set("launch_horizon_months", Math.max(0, Math.round(num(e.target.value))))} /></Field>}
             </div>
             {data.monthly_fixed_costs > 0 && data.price > 0 && (
               <div className="rounded-xl bg-slate-900/4 p-3 text-[12.5px] text-fg/85">
@@ -282,11 +353,13 @@ export function Wizard() {
           </div>
         )}
 
-        {step === 4 && (
+        {cur.key === "review" && (
           <div className="space-y-4">
-            <Header title="Pronto para fundar?" sub="Vamos criar sua cidade. Depois você roda a análise, gera 100 clientes e simula." />
+            <Header title={existing ? "Pronto para o diagnóstico?" : "Pronto para fundar?"} sub={existing ? "Seu negócio entra na cidade já construído. Depois você roda o diagnóstico, gera 100 clientes do seu público e simula." : "Vamos criar sua cidade. Depois você roda a análise, gera 100 clientes e simula."} />
             <dl className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
               <Row k="Negócio" v={`${data.name} · ${data.category}`} />
+              <Row k="Estágio" v={existing ? `já existe · ${data.existing?.months_operating ?? 0} meses` : "vou abrir"} />
+              {existing && data.existing && <Row k="Hoje" v={`${brl(data.existing.monthly_revenue)}/mês · ${data.existing.customers_per_month} clientes/mês`} />}
               <Row k="Modelo" v={data.model} />
               {physical && <Row k="Local" v={[data.location.neighborhood, data.location.city, data.location.state].filter(Boolean).join(", ")} />}
               <Row k="Preço" v={`${brl(data.price)} · ${data.pricing_model}`} />
@@ -300,15 +373,29 @@ export function Wizard() {
           </div>
         )}
 
+        {importOpen && (
+          <div className="mt-5 rounded-xl border border-accent/30 bg-accent/6 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-semibold">Preencher com o Claude</div>
+              <a href="/briefing-founder-city.md" download className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"><FileText className="size-3.5" /> Baixar briefing para o Claude</a>
+            </div>
+            <p className="mb-2 text-[12px] text-muted">Mande o briefing ao Claude (chat) junto com o que ele sabe do negócio. Ele devolve um bloco JSON; cole aqui e o formulário se preenche sozinho.</p>
+            <Textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6} placeholder='{"stage": "existente", "name": "...", ...}' className="font-mono text-[12px]" />
+            {importMsg && <p className="mt-1 text-xs text-reject">{importMsg}</p>}
+            <div className="mt-2 flex justify-end"><Button size="sm" onClick={importJson} disabled={!importText.trim()}><Check className="size-3.5" /> Preencher formulário</Button></div>
+          </div>
+        )}
+
         <div className="mt-6 flex items-center justify-between gap-3">
           <div className="flex gap-2">
             {step > 0 && <Button variant="ghost" onClick={() => setStep((s) => s - 1)}><ArrowLeft className="size-4" /> Voltar</Button>}
-            {step === 0 && <Button variant="ghost" onClick={() => setData(EXAMPLE)} title="Preenche um exemplo completo"><Wand2 className="size-4" /> Usar exemplo</Button>}
+            {step === 0 && <Button variant="ghost" onClick={() => setData(EXAMPLE)} title="Preenche um exemplo completo"><Wand2 className="size-4" /> Exemplo</Button>}
+            {step === 0 && <Button variant="ghost" onClick={() => setImportOpen((v) => !v)} title="Cole o JSON devolvido pelo Claude"><FileJson className="size-4" /> Importar JSON</Button>}
           </div>
-          {step < STEPS.length - 1 ? (
+          {step < steps.length - 1 ? (
             <Button onClick={next}>Continuar <ArrowRight className="size-4" /></Button>
           ) : (
-            <Button variant="gold" size="lg" onClick={submit} loading={saving}><Rocket className="size-4" /> Fundar negócio</Button>
+            <Button variant="gold" size="lg" onClick={submit} loading={saving}><Rocket className="size-4" /> {existing ? "Entrar na cidade" : "Fundar negócio"}</Button>
           )}
         </div>
       </div>

@@ -7,7 +7,25 @@ export type BusinessModel = z.infer<typeof BusinessModel>;
 
 export const PricingModel = z.enum(["unico", "assinatura", "recorrente", "comissao", "freemium", "pacote"]);
 
+export const Stage = z.enum(["ideia", "existente"]);
+export type Stage = z.infer<typeof Stage>;
+
+export const ExistingSchema = z.object({
+  months_operating: z.number().int().min(0),
+  monthly_revenue: z.number().nonnegative(),
+  customers_per_month: z.number().nonnegative(),
+  growth_goal: z.string(),
+  what_works: z.string(),
+  what_fails: z.string(),
+  main_challenges: z.string(),
+  online_presence: z.string(),
+  reviews: z.string(),
+});
+export type Existing = z.infer<typeof ExistingSchema>;
+
 export const BusinessInputSchema = z.object({
+  stage: Stage.default("ideia"),
+  existing: ExistingSchema.nullable().default(null),
   name: z.string().min(2, "Dê um nome ao negócio"),
   pitch: z.string().min(20, "Descreva a ideia com mais detalhes"),
   category: z.string().min(2, "Informe o segmento"),
@@ -34,7 +52,21 @@ export const BusinessInputSchema = z.object({
 });
 export type BusinessInput = z.infer<typeof BusinessInputSchema>;
 
+export const emptyExisting = (): Existing => ({
+  months_operating: 12,
+  monthly_revenue: 0,
+  customers_per_month: 0,
+  growth_goal: "",
+  what_works: "",
+  what_fails: "",
+  main_challenges: "",
+  online_presence: "",
+  reviews: "",
+});
+
 export const emptyBusinessInput = (): BusinessInput => ({
+  stage: "ideia",
+  existing: null,
   name: "",
   pitch: "",
   category: "",

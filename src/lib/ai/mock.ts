@@ -66,7 +66,7 @@ export function mockAnalysis(input: BusinessInput): Analysis {
     { name: "Cliente tradicional", share_pct: 15, description: "45+, fiel ao que já usa, confia em indicação.", typical_objection: "Já tenho onde resolvo isso há anos." },
   ];
   return {
-    executive_summary: `${input.name} entra em um mercado ${score > 55 ? "com demanda consistente" : "competitivo e sensível a preço"} em ${physical ? city : "ambiente online"}. A proposta tem diferenciais perceptíveis, mas o sucesso depende de converter o público declarado a um ticket de R$ ${price}, o que exige prova social rápida e controle de CAC. (Dados sintéticos do modo demonstração.)`,
+    executive_summary: `${input.name} ${input.stage === "existente" ? "opera" : "entra"} em um mercado ${score > 55 ? "com demanda consistente" : "competitivo e sensível a preço"} em ${physical ? city : "ambiente online"}. A proposta tem diferenciais perceptíveis, mas o sucesso depende de converter o público declarado a um ticket de R$ ${price}, o que exige prova social rápida e controle de CAC. (Dados sintéticos do modo demonstração.)`,
     market: {
       tam_brl_year: som * 40,
       sam_brl_year: som * 8,

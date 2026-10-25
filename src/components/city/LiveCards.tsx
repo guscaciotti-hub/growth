@@ -23,7 +23,7 @@ export function LiveCards() {
 
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-10 hidden items-end gap-3 lg:left-[448px] lg:right-[318px] lg:flex lg:gap-2">
-      <Card icon="🏢" tint="#dbeafe" title="Sede" live={live && phase === "analyzing"} rows={[["Viabilidade", `${score}/100`, scoreColor], ["Break-even", `${ue.breakeven_customers_per_month}/mês`], ["Runway", `${ue.runway_months} meses`]]} />
+      <Card icon="🏢" tint="#dbeafe" title="Sede" live={live && phase === "analyzing"} rows={[[bundle.project.input.stage === "existente" ? "Crescimento" : "Viabilidade", `${score}/100`, scoreColor], ["Break-even", `${ue.breakeven_customers_per_month}/mês`], ["Runway", `${ue.runway_months} meses`]]} />
       <Card icon="👥" tint="#ede9fe" title="Clientes" live={live && phase === "personas"} rows={[["Na cidade", `${bundle.personas.length}`], ["Segmentos", `${analysis.icp.segments.length}`], ["Ticket", `${brl(analysis.pricing.suggested_price_min)}–${brl(analysis.pricing.suggested_price_max)}`]]} />
       {run && (
         <Card icon="🛒" tint="#dcfce7" title={run.label} live={live && phase === "simulating"} rows={[["Compraram", `${buy}`, "#16a34a"], ["Pensando", `${later}`, "#d97706"], ["Recusaram", `${reject}`, "#e11d48"], ...(m ? ([["Receita/100", brl(m.projected_monthly_revenue, true)]] as [string, string][]) : [])]} />
