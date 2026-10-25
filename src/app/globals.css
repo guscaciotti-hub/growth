@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #060a13;
+  --bg-2: #0b1222;
+  --panel: rgba(12, 18, 33, 0.78);
+  --panel-border: rgba(148, 163, 184, 0.14);
+  --fg: #e6edf7;
+  --muted: #8b9bb4;
+  --accent: #38bdf8;
+  --accent-2: #a78bfa;
+  --buy: #34d399;
+  --later: #fbbf24;
+  --reject: #fb7185;
+  --gold: #f5c451;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-buy: var(--buy);
+  --color-later: var(--later);
+  --color-reject: var(--reject);
+  --color-gold: var(--gold);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html, body { height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 70% -10%, #15213f 0%, var(--bg) 55%), var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
+.scroll-thin { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,.25) transparent; }
+
+@keyframes pulse-ring { 0% { transform: scale(.9); opacity: .9 } 100% { transform: scale(1.6); opacity: 0 } }
+.pulse-ring::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  border: 2px solid var(--accent); animation: pulse-ring 1.4s ease-out infinite;
+}
+
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.04) 75%);
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+.rise { animation: rise .35s ease-out both; }
+
+input, textarea, select {
+  color-scheme: dark;
+}
+input[type="range"] { accent-color: var(--accent); }
+
+.num { font-variant-numeric: tabular-nums; }
+
+@keyframes coinpop { 0% { transform: translateY(0); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(-38px); opacity: 0 } }
+.coin-pop { animation: coinpop 1.9s ease-out forwards; }
