@@ -1,0 +1,29 @@
+name: Deploy to Netlify
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_id:
+        description: "Netlify site id"
+        required: true
+        default: "57f48973-fdd9-4c56-b6b7-4caef4e076f5"
+      proxy_path:
+        description: "Netlify MCP proxy path (gerado por 'deploy-site' no conector Netlify)"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Upload e build no Netlify
+        env:
+          PROXY_PATH: ${{ inputs.proxy_path }}
+          SITE_ID: ${{ inputs.site_id }}
+        run: |
+          echo "::add-mask::$PROXY_PATH"
+          rm -rf node_modules .next video/renders video/.hyperframes
+          npx -y @netlify/mcp@latest --site-id "$SITE_ID" --proxy-path "$PROXY_PATH"
