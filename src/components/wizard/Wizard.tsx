@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Lightbulb, MapPin, Tag, Wallet, Rocket, Wand2 } 
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui";
 import { BusinessInputSchema, emptyBusinessInput, type BusinessInput } from "@/lib/types";
 import { brl } from "@/lib/format";
+import { saveLocal } from "@/lib/local";
 
 const STEPS = [
   { key: "idea", title: "A ideia", icon: Lightbulb, desc: "O que você quer abrir e para quem" },
@@ -93,10 +94,20 @@ export function Wizard() {
     setSaving(true);
     setServerError(null);
     try {
-      const res = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: data }) });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Falha ao criar projeto");
-      router.push(`/projeto/${j.id}`);
+      let id: string | null = null;
+      try {
+        const res = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: data }) });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && j.id) id = j.id;
+        else if (res.status === 400) throw new Error(j.error ?? "Dados inválidos");
+      } catch (e) {
+        if (e instanceof Error && e.message === "Dados inválidos") throw e;
+        /* servidor sem persistência: segue só com a cópia local */
+      }
+      id ??= crypto.randomUUID();
+      const now = new Date().toISOString();
+      saveLocal({ project: { id, name: data.name, status: "draft", input: data, created_at: now, updated_at: now }, analysis: null, personas: [], runs: [] });
+      router.push(`/projeto/${id}`);
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
       setSaving(false);

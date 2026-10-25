@@ -18,6 +18,11 @@ import { mockSimulateBatch, mockSummary } from "./mock";
 const BATCH = 10;
 const CONCURRENCY = 5;
 
+/** Simula um único lote de personas (chamada curta, boa para serverless). */
+export async function simulateBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<SimResult[]> {
+  return isMockMode() ? mockBatchDelay(() => mockSimulateBatch(input, analysis, personas, scenario)) : realBatch(input, analysis, personas, scenario);
+}
+
 export async function runSimulation(
   input: BusinessInput,
   analysis: Analysis,

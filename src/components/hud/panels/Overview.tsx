@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useProject, useActiveRun } from "@/store/useProject";
 import { Badge, Button, Empty, Gauge, Stat, cx } from "@/components/ui";
 import { brl, ratingLabel, scoreToRating } from "@/lib/format";
-import { blendedScore } from "@/lib/metrics";
+import { blendedScore, computeMetrics } from "@/lib/metrics";
 
 export function OverviewPanel() {
   const bundle = useProject((s) => s.bundle)!;
@@ -41,6 +41,19 @@ export function OverviewPanel() {
   }
 
   const score = blendedScore(a.verdict.success_score, run?.summary?.success_score_after ?? null);
+  const exportBundle = (format: "js" | "json") => {
+    const runs = bundle.runs.map((r) => ({ ...r, metrics: r.summary?.metrics ?? (r.results.length ? computeMetrics(r.results, bundle.personas, input, a, r.config.price_override ?? input.price) : null) }));
+    const payload = { exported_at: new Date().toISOString(), ...bundle, runs };
+    const slug = bundle.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "projeto";
+    const text = format === "json" ? JSON.stringify(payload, null, 2) : `/* Founder City — dados exportados em ${payload.exported_at}. Salve como video/assets/data.js */\nwindow.FOUNDER_DATA = ${JSON.stringify(payload)};\n`;
+    const blob = new Blob([text], { type: format === "json" ? "application/json" : "text/javascript" });
+    const url = URL.createObjectURL(blob);
+    const el = document.createElement("a");
+    el.href = url;
+    el.download = format === "json" ? `${slug}.json` : "data.js";
+    el.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
   const rating = scoreToRating(score);
   const ue = a.unit_economics;
 
@@ -105,8 +118,8 @@ export function OverviewPanel() {
         <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted"><Clapperboard className="size-3.5 text-accent-2" /> Vídeo do resultado</div>
         <p className="text-[12px] text-muted">Exporte os dados e renderize um filme 3D de 26s com HyperFrames (pasta <code className="text-fg/80">video/</code>): salve como <code className="text-fg/80">video/assets/data.js</code> e rode <code className="text-fg/80">npm run render</code>.</p>
         <div className="mt-2 flex gap-2">
-          <a href={`/api/projects/${bundle.project.id}/export?format=js`} download className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> data.js</a>
-          <a href={`/api/projects/${bundle.project.id}/export?format=json`} download className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> JSON</a>
+          <button onClick={() => exportBundle("js")} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> data.js</button>
+          <button onClick={() => exportBundle("json")} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-900/10 bg-slate-900/5 px-3 py-1.5 text-xs font-medium hover:bg-slate-900/10"><Download className="size-3.5" /> JSON</button>
         </div>
       </div>
 

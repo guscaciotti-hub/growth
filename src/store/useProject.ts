@@ -1,7 +1,8 @@
 "use client";
 import { create } from "zustand";
-import type { Persona, ProjectBundle, Run, ScenarioConfig, SimResult, StreamEvent } from "@/lib/types";
-import { readNdjson } from "@/lib/stream";
+import type { Analysis, Persona, ProjectBundle, Run, RunMetrics, RunSummary, ScenarioConfig, SimResult } from "@/lib/types";
+import { planPersonaBatches, PERSONA_COUNT } from "@/lib/plan";
+import { loadLocal, progressOf, saveLocal } from "@/lib/local";
 
 export type Phase = "idle" | "analyzing" | "personas" | "simulating";
 export type PanelKey = "overview" | "market" | "customers" | "simulation" | "adjust";
@@ -34,6 +35,20 @@ type State = {
 };
 
 let logId = 0;
+const SIM_BATCH = 10;
+const SIM_CONCURRENCY = 5;
+
+async function postJSON<T>(url: string, body: unknown): Promise<T & { mode?: { ai: string } }> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  let j: { error?: string } & T;
+  try {
+    j = await res.json();
+  } catch {
+    throw new Error(res.ok ? "Resposta inválida do servidor." : `Erro ${res.status} no servidor (${res.statusText || "sem resposta"}).`);
+  }
+  if (!res.ok) throw new Error(j.error ?? `Erro ${res.status}`);
+  return j;
+}
 
 export const useProject = create<State>((set, get) => ({
   bundle: null,
@@ -52,34 +67,69 @@ export const useProject = create<State>((set, get) => ({
 
   async load(id) {
     set({ loading: true, error: null });
+    const local = loadLocal(id);
+    let server: ProjectBundle | null = null;
+    let mode: "demo" | "live" = get().mode;
     try {
       const res = await fetch(`/api/projects/${id}`, { cache: "no-store" });
-      if (!res.ok) throw new Error(res.status === 404 ? "Projeto não encontrado neste navegador." : `Erro ${res.status}`);
-      const data = await res.json();
-      const bundle: ProjectBundle = { project: data.project, analysis: data.analysis, personas: data.personas ?? [], runs: data.runs ?? [] };
-      const lastDone = [...bundle.runs].reverse().find((r) => r.status === "done") ?? bundle.runs.at(-1) ?? null;
-      set({
-        bundle,
-        mode: data.mode?.ai === "live" ? "live" : "demo",
-        research: bundle.analysis?.research ?? null,
-        activeRunId: lastDone?.id ?? null,
-        loading: false,
-        panel: lastDone ? "simulation" : bundle.analysis ? "overview" : "overview",
-      });
-    } catch (e) {
-      set({ loading: false, error: e instanceof Error ? e.message : String(e) });
+      if (res.ok) {
+        const d = await res.json();
+        server = { project: d.project, analysis: d.analysis, personas: d.personas ?? [], runs: d.runs ?? [] };
+        mode = d.mode?.ai === "live" ? "live" : "demo";
+      } else {
+        const m = await fetch("/api/projects", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+        if (m?.mode?.ai) mode = m.mode.ai === "live" ? "live" : "demo";
+      }
+    } catch {
+      /* offline ou servidor indisponível: usa a cópia local */
     }
+    const bundle = progressOf(local) >= progressOf(server) ? local : server;
+    if (!bundle) {
+      set({ loading: false, error: "Projeto não encontrado neste navegador." });
+      return;
+    }
+    saveLocal(bundle);
+    const lastDone = [...bundle.runs].reverse().find((r) => r.status === "done") ?? bundle.runs.at(-1) ?? null;
+    set({
+      bundle,
+      mode,
+      research: bundle.analysis?.research ?? null,
+      activeRunId: lastDone?.id ?? null,
+      loading: false,
+      panel: lastDone ? "simulation" : "overview",
+    });
   },
 
   async analyze(opts) {
     const b = get().bundle;
     if (!b || get().phase !== "idle") return;
-    set({ phase: "analyzing", progress: 0.02, statusMessage: "Preparando análise…", error: null, panel: "overview" });
+    set({ phase: "analyzing", progress: 0.03, statusMessage: "Preparando análise…", error: null, panel: "overview" });
     pushLog(set, { kind: "info", text: "Análise de viabilidade iniciada." });
     try {
-      const res = await fetch(`/api/projects/${b.project.id}/analyze`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skipResearch: opts?.skipResearch ?? false }) });
-      await readNdjson(res, (e) => handleEvent(e, set, get));
-      set({ cameraFocus: "hq" });
+      const input = b.project.input;
+      let research: string | null = null;
+      if (!opts?.skipResearch) {
+        set({ statusMessage: "Pesquisando mercado, concorrentes e região…", progress: 0.12 });
+        try {
+          const r = await postJSON<{ research: string }>("/api/ai/research", { input });
+          research = r.research;
+          set({ research, ...(r.mode ? { mode: r.mode.ai === "live" ? "live" : "demo" } : {}) });
+          pushLog(set, { kind: "info", text: "Pesquisa de mercado concluída." });
+        } catch (e) {
+          pushLog(set, { kind: "info", text: `Pesquisa indisponível (${e instanceof Error ? e.message : "erro"}); seguindo sem ela.` });
+        }
+      }
+      set({ statusMessage: "Analisando mercado, preço, concorrência, ameaças e economia unitária…", progress: 0.45 });
+      const a = await postJSON<{ analysis: Analysis }>("/api/ai/analyze", { input, research });
+      const analysis = a.analysis;
+      update(set, (bundle) => ({
+        ...bundle,
+        analysis: { id: crypto.randomUUID(), data: analysis, research, model: null, created_at: new Date().toISOString() },
+        project: { ...bundle.project, status: "analyzed", updated_at: new Date().toISOString() },
+      }));
+      if (a.mode) set({ mode: a.mode.ai === "live" ? "live" : "demo" });
+      pushLog(set, { kind: "info", text: `Veredito do analista: ${analysis.verdict.headline} (${analysis.verdict.success_score}/100)` });
+      set({ cameraFocus: "hq", progress: 1 });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -89,13 +139,27 @@ export const useProject = create<State>((set, get) => ({
 
   async generatePersonas() {
     const b = get().bundle;
-    if (!b || get().phase !== "idle") return;
-    set({ phase: "personas", progress: 0.02, statusMessage: "Gerando clientes…", error: null, panel: "customers" });
-    set((s) => ({ bundle: s.bundle ? { ...s.bundle, personas: [] } : s.bundle }));
+    if (!b || !b.analysis || get().phase !== "idle") return;
+    const analysis = b.analysis.data;
+    const input = b.project.input;
+    set({ phase: "personas", progress: 0.03, statusMessage: `Gerando ${PERSONA_COUNT} clientes dentro do ICP "${analysis.icp.name}"…`, error: null, panel: "customers" });
+    update(set, (bundle) => ({ ...bundle, personas: [] }));
     pushLog(set, { kind: "info", text: "Gerando 100 clientes dentro do ICP." });
     try {
-      const res = await fetch(`/api/projects/${b.project.id}/personas`, { method: "POST" });
-      await readNdjson(res, (e) => handleEvent(e, set, get));
+      const batches = planPersonaBatches(analysis);
+      let done = 0;
+      await Promise.all(
+        batches.map(async (batch) => {
+          const r = await postJSON<{ personas: Persona[] }>("/api/ai/personas", { input, analysis, batch });
+          done += r.personas.length;
+          update(set, (bundle) => ({
+            ...bundle,
+            personas: [...bundle.personas, ...r.personas].sort((x, y) => x.idx - y.idx),
+            project: { ...bundle.project, status: "personas", updated_at: new Date().toISOString() },
+          }));
+          set({ statusMessage: `${Math.min(done, PERSONA_COUNT)}/${PERSONA_COUNT} clientes criados`, progress: 0.05 + 0.9 * (done / PERSONA_COUNT) });
+        }),
+      );
       set({ cameraFocus: "overview" });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
@@ -106,13 +170,55 @@ export const useProject = create<State>((set, get) => ({
 
   async simulate(scenario) {
     const b = get().bundle;
-    if (!b || get().phase !== "idle") return;
-    set({ phase: "simulating", progress: 0.02, statusMessage: "Abrindo as portas…", error: null, panel: "simulation", selectedPersonaIdx: null });
-    pushLog(set, { kind: "info", text: `Simulação "${scenario.label}" iniciada.` });
+    if (!b || !b.analysis || b.personas.length === 0 || get().phase !== "idle") return;
+    const input = b.project.input;
+    const analysis = b.analysis.data;
+    const personas = b.personas;
+    const runId = crypto.randomUUID();
+    const run: Run = { id: runId, label: scenario.label || `Cenário ${b.runs.length + 1}`, config: scenario, status: "running", summary: null, results: [], created_at: new Date().toISOString(), finished_at: null };
+    set({ phase: "simulating", progress: 0.03, statusMessage: `Apresentando a oferta para ${personas.length} clientes…`, error: null, panel: "simulation", selectedPersonaIdx: null, activeRunId: runId });
+    update(set, (bundle) => ({ ...bundle, runs: [...bundle.runs, run], project: { ...bundle.project, status: "simulating" } }));
+    pushLog(set, { kind: "info", text: `Simulação "${run.label}" iniciada.` });
+    const byIdx = new Map<number, Persona>(personas.map((p) => [p.idx, p]));
     try {
-      const res = await fetch(`/api/projects/${b.project.id}/simulate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario }) });
-      await readNdjson(res, (e) => handleEvent(e, set, get));
+      const chunks: Persona[][] = [];
+      for (let i = 0; i < personas.length; i += SIM_BATCH) chunks.push(personas.slice(i, i + SIM_BATCH));
+      let next = 0;
+      let done = 0;
+      const all: SimResult[] = [];
+      const workers = Array.from({ length: Math.min(SIM_CONCURRENCY, chunks.length) }, async () => {
+        while (next < chunks.length) {
+          const chunk = chunks[next++];
+          const r = await postJSON<{ results: SimResult[] }>("/api/ai/simulate", { input, analysis, personas: chunk, scenario });
+          all.push(...r.results);
+          done += chunk.length;
+          update(set, (bundle) => ({
+            ...bundle,
+            runs: bundle.runs.map((x) => (x.id === runId ? { ...x, results: mergeResults(x.results, r.results) } : x)),
+          }));
+          for (const res of r.results) {
+            const p = byIdx.get(res.persona_idx);
+            pushLog(set, {
+              kind: res.decision === "compra" ? "buy" : res.decision === "depois" ? "later" : "reject",
+              text: `${p?.name ?? "Cliente"}${p ? `, ${p.age}` : ""}: “${res.reasoning}”`,
+              personaIdx: res.persona_idx,
+            });
+          }
+          set({ statusMessage: `${done}/${personas.length} clientes decidiram`, progress: 0.05 + 0.75 * (done / personas.length) });
+        }
+      });
+      await Promise.all(workers);
+      set({ statusMessage: "Sintetizando objeções, preço e veredito…", progress: 0.85 });
+      const s = await postJSON<{ summary: RunSummary & { metrics: RunMetrics } }>("/api/ai/summary", { input, analysis, personas, results: all.sort((x, y) => x.persona_idx - y.persona_idx), scenario });
+      update(set, (bundle) => ({
+        ...bundle,
+        runs: bundle.runs.map((x) => (x.id === runId ? { ...x, summary: s.summary, status: "done" as const, finished_at: new Date().toISOString() } : x)),
+        project: { ...bundle.project, status: "simulated", updated_at: new Date().toISOString() },
+      }));
+      pushLog(set, { kind: "info", text: s.summary.headline });
+      set({ cameraFocus: "hq" });
     } catch (e) {
+      update(set, (bundle) => ({ ...bundle, runs: bundle.runs.map((x) => (x.id === runId ? { ...x, status: "error" as const, finished_at: new Date().toISOString() } : x)) }));
       set({ error: e instanceof Error ? e.message : String(e) });
     } finally {
       set({ phase: "idle", progress: 0 });
@@ -132,69 +238,14 @@ function pushLog(set: Set, e: Omit<LogEntry, "id" | "t">) {
   set((s) => ({ log: [...s.log.slice(-199), { ...e, id: ++logId, t: Date.now() }] }));
 }
 
-function handleEvent(e: StreamEvent, set: Set, get: () => State) {
-  switch (e.type) {
-    case "status":
-      set({ statusMessage: e.message, ...(e.progress !== undefined ? { progress: e.progress } : {}) });
-      break;
-    case "research":
-      set({ research: e.text });
-      pushLog(set, { kind: "info", text: "Pesquisa de mercado concluída." });
-      break;
-    case "analysis":
-      set((s) => ({
-        bundle: s.bundle
-          ? { ...s.bundle, analysis: { id: e.id, data: e.data, research: s.research, model: null, created_at: new Date().toISOString() }, project: { ...s.bundle.project, status: "analyzed" } }
-          : s.bundle,
-      }));
-      pushLog(set, { kind: "info", text: `Veredito do analista: ${e.data.verdict.headline} (${e.data.verdict.success_score}/100)` });
-      break;
-    case "personas":
-      set((s) => {
-        if (!s.bundle) return {};
-        const merged = [...s.bundle.personas, ...e.batch].sort((a, b) => a.idx - b.idx);
-        return { bundle: { ...s.bundle, personas: merged, project: { ...s.bundle.project, status: "personas" } } };
-      });
-      break;
-    case "run": {
-      const run: Run = { id: e.id, label: e.label, config: e.config, status: "running", summary: null, results: [], created_at: new Date().toISOString(), finished_at: null };
-      set((s) => ({ bundle: s.bundle ? { ...s.bundle, runs: [...s.bundle.runs, run], project: { ...s.bundle.project, status: "simulating" } } : s.bundle, activeRunId: e.id }));
-      break;
-    }
-    case "results": {
-      const runId = get().activeRunId;
-      const personas = get().bundle?.personas ?? [];
-      const byIdx = new Map<number, Persona>(personas.map((p) => [p.idx, p]));
-      set((s) => {
-        if (!s.bundle) return {};
-        const runs = s.bundle.runs.map((r) => (r.id === runId ? { ...r, results: mergeResults(r.results, e.batch) } : r));
-        return { bundle: { ...s.bundle, runs } };
-      });
-      for (const r of e.batch) {
-        const p = byIdx.get(r.persona_idx);
-        pushLog(set, {
-          kind: r.decision === "compra" ? "buy" : r.decision === "depois" ? "later" : "reject",
-          text: `${p?.name ?? "Cliente"}${p ? `, ${p.age}` : ""}: “${r.reasoning}”`,
-          personaIdx: r.persona_idx,
-        });
-      }
-      break;
-    }
-    case "summary":
-      set((s) => {
-        if (!s.bundle) return {};
-        const runs = s.bundle.runs.map((r) => (r.id === e.runId ? { ...r, summary: e.data, status: "done" as const, finished_at: new Date().toISOString() } : r));
-        return { bundle: { ...s.bundle, runs, project: { ...s.bundle.project, status: "simulated" } }, cameraFocus: "hq" };
-      });
-      pushLog(set, { kind: "info", text: e.data.headline });
-      break;
-    case "error":
-      set({ error: e.message });
-      pushLog(set, { kind: "info", text: `Erro: ${e.message}` });
-      break;
-    case "done":
-      break;
-  }
+/** Atualiza o bundle e persiste no navegador. */
+function update(set: Set, fn: (b: ProjectBundle) => ProjectBundle) {
+  set((s) => {
+    if (!s.bundle) return {};
+    const bundle = fn(s.bundle);
+    saveLocal(bundle);
+    return { bundle };
+  });
 }
 
 function mergeResults(prev: SimResult[], batch: SimResult[]): SimResult[] {
@@ -203,7 +254,6 @@ function mergeResults(prev: SimResult[], batch: SimResult[]): SimResult[] {
   return [...m.values()].sort((a, b) => a.persona_idx - b.persona_idx);
 }
 
-/* seletores */
 export const useActiveRun = () =>
   useProject((s) => {
     const runs = s.bundle?.runs ?? [];

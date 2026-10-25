@@ -5,6 +5,7 @@ import { Trash2, ArrowRight } from "lucide-react";
 import type { ProjectListItem } from "@/lib/types";
 import { Badge, Spinner, cx } from "@/components/ui";
 import { scoreToRating, ratingLabel } from "@/lib/format";
+import { listLocal, removeLocal } from "@/lib/local";
 
 const STATUS: Record<string, { label: string; tone: "neutral" | "accent" | "later" | "buy" | "gold" }> = {
   draft: { label: "terreno", tone: "neutral" },
@@ -21,11 +22,22 @@ export function ProjectList() {
 
   const load = async () => {
     try {
-      const res = await fetch("/api/projects", { cache: "no-store" });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Erro ao carregar");
-      setItems(j.projects);
-      setMode(j.mode);
+      const local = listLocal();
+      let server: ProjectListItem[] = [];
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        const j = await res.json();
+        if (res.ok) {
+          server = j.projects ?? [];
+          setMode(j.mode);
+        }
+      } catch {
+        /* servidor indisponível: mostra só o local */
+      }
+      const byId = new Map<string, ProjectListItem>();
+      for (const p of server) byId.set(p.id, p);
+      for (const p of local) byId.set(p.id, p);
+      setItems([...byId.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -36,7 +48,8 @@ export function ProjectList() {
 
   const remove = async (id: string) => {
     if (!confirm("Apagar este projeto e tudo que foi simulado?")) return;
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    removeLocal(id);
+    await fetch(`/api/projects/${id}`, { method: "DELETE" }).catch(() => undefined);
     load();
   };
 
@@ -47,7 +60,7 @@ export function ProjectList() {
         {mode && (
           <div className="flex gap-1.5">
             <Badge tone={mode.ai === "live" ? "accent" : "later"}>{mode.ai === "live" ? "IA ao vivo" : "modo demonstração"}</Badge>
-            <Badge tone={mode.storage === "memory" ? "neutral" : "buy"}>{mode.storage === "memory" ? "memória local" : "salvo na nuvem"}</Badge>
+            <Badge tone={mode.storage === "memory" ? "neutral" : "buy"}>{mode.storage === "memory" ? "salvo neste navegador" : "salvo na nuvem"}</Badge>
           </div>
         )}
       </div>
