@@ -17,11 +17,19 @@ export interface Store {
   finishRun(token: string, runId: string, summary: (RunSummary & { metrics: RunMetrics }) | null, status: Run["status"]): Promise<void>;
 }
 
+/** Esquema sim_* ausente no Supabase (migração não aplicada). */
+export class SchemaMissingError extends Error {
+  constructor(fn: string) {
+    super(`Supabase sem o esquema do simulador (função ${fn} não encontrada). Aplique supabase/migrations/0001_sim_schema.sql.`);
+  }
+}
+
 class SupabaseStore implements Store {
   private async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
     const { data, error } = await supabase().rpc(fn, args);
     if (error) {
       if (error.code === "P0002" || /not_found/.test(error.message)) throw new NotFoundError();
+      if (error.code === "PGRST202" || /Could not find the function|schema cache/i.test(error.message)) throw new SchemaMissingError(fn);
       throw new Error(`${fn}: ${error.message}`);
     }
     return data as T;
@@ -152,12 +160,47 @@ export class NotFoundError extends Error {
   }
 }
 
-let store: Store | null = null;
+/* Se o Supabase está configurado mas o esquema não foi migrado, cai para memória
+   (com aviso) em vez de derrubar o app. */
+class ResilientStore implements Store {
+  private primary: Store = new SupabaseStore();
+  private fallback: Store = new MemoryStore();
+  degraded = false;
+  private async run<T>(fn: (s: Store) => Promise<T>): Promise<T> {
+    if (this.degraded) return fn(this.fallback);
+    try {
+      return await fn(this.primary);
+    } catch (e) {
+      if (e instanceof SchemaMissingError) {
+        console.warn(`[store] ${e.message} Usando memória até a migração ser aplicada.`);
+        this.degraded = true;
+        return fn(this.fallback);
+      }
+      throw e;
+    }
+  }
+  createProject(t: string, n: string, i: BusinessInput) { return this.run((s) => s.createProject(t, n, i)); }
+  listProjects(t: string) { return this.run((s) => s.listProjects(t)); }
+  getProject(t: string, id: string) { return this.run((s) => s.getProject(t, id)); }
+  updateProject(t: string, id: string, p: { status?: ProjectStatus; input?: BusinessInput; name?: string }) { return this.run((s) => s.updateProject(t, id, p)); }
+  deleteProject(t: string, id: string) { return this.run((s) => s.deleteProject(t, id)); }
+  saveAnalysis(t: string, p: string, d: Analysis, r: string | null, m: string) { return this.run((s) => s.saveAnalysis(t, p, d, r, m)); }
+  savePersonas(t: string, p: string, ps: Persona[]) { return this.run((s) => s.savePersonas(t, p, ps)); }
+  createRun(t: string, p: string, c: ScenarioConfig) { return this.run((s) => s.createRun(t, p, c)); }
+  saveResults(t: string, r: string, res: SimResult[]) { return this.run((s) => s.saveResults(t, r, res)); }
+  finishRun(t: string, r: string, sum: (RunSummary & { metrics: RunMetrics }) | null, st: Run["status"]) { return this.run((s) => s.finishRun(t, r, sum, st)); }
+}
+
+const g2 = globalThis as unknown as { __simStore?: Store };
 export function getStore(): Store {
-  if (!store) {
-    store = hasSupabase() ? new SupabaseStore() : new MemoryStore();
+  if (!g2.__simStore) {
+    g2.__simStore = hasSupabase() ? new ResilientStore() : new MemoryStore();
     if (!hasSupabase()) console.warn("[store] Supabase não configurado: usando memória (dados não persistem).");
   }
-  return store;
+  return g2.__simStore;
 }
-export const storageMode = (): "supabase" | "memory" => (hasSupabase() ? "supabase" : "memory");
+export const storageMode = (): "supabase" | "memory" => {
+  if (!hasSupabase()) return "memory";
+  const s = g2.__simStore;
+  return s instanceof ResilientStore && s.degraded ? "memory" : "supabase";
+};
