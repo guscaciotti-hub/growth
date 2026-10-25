@@ -1,4 +1,3 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
   RunSummarySchema,
   SimBatchSchema,
@@ -10,7 +9,7 @@ import {
   type ScenarioConfig,
   type SimResult,
 } from "../types";
-import { anthropic, FALLBACK_BETA, MODEL_ANALYSIS, MODEL_SIM, RefusalError, isMockMode } from "./client";
+import { MODEL_ANALYSIS, MODEL_SIM, isMockMode, structured } from "./client";
 import { SIM_SYSTEM, ANALYST_SYSTEM, simulateBatchPrompt, summaryPrompt } from "./prompts";
 import { computeMetrics, metricsToText } from "../metrics";
 import { mockSimulateBatch, mockSummary } from "./mock";
@@ -55,20 +54,15 @@ async function mockBatchDelay<T>(fn: () => T): Promise<T> {
 }
 
 async function realBatch(input: BusinessInput, analysis: Analysis, personas: Persona[], scenario: ScenarioConfig): Promise<{ results: SimResult[]; usage: Usage }> {
-  const client = anthropic();
-  const res = await client.beta.messages.parse({
+  const { data, raw } = await structured({
     model: MODEL_SIM,
-    max_tokens: 24000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: zodOutputFormat(SimBatchSchema) },
     system: SIM_SYSTEM,
-    messages: [{ role: "user", content: simulateBatchPrompt(input, analysis, personas, scenario) }],
+    prompt: simulateBatchPrompt(input, analysis, personas, scenario),
+    schema: SimBatchSchema,
+    effort: "medium",
+    maxTokens: 24000,
   });
-  if (res.stop_reason === "refusal") {
-    throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
-  }
-  if (!res.parsed_output) throw new Error("Lote de simulação inválido.");
+  const res = { parsed_output: data };
   const valid = new Set(personas.map((p) => p.idx));
   const seen = new Set<number>();
   const out: SimResult[] = [];
@@ -98,7 +92,7 @@ async function realBatch(input: BusinessInput, analysis: Analysis, personas: Per
       });
     }
   }
-  return { results: out, usage: usageOf(res, MODEL_SIM) };
+  return { results: out, usage: usageOf(raw, MODEL_SIM) };
 }
 
 export async function summarizeRun(
@@ -124,21 +118,14 @@ export async function summarizeRun(
     })
     .join("\n");
 
-  const client = anthropic();
-  const res = await client.beta.messages.parse({
+  const { data: s, raw } = await structured({
     model: MODEL_ANALYSIS,
-    max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "high", format: zodOutputFormat(RunSummarySchema) },
     system: ANALYST_SYSTEM,
-    messages: [{ role: "user", content: summaryPrompt(input, analysis, scenario, metricsToText(metrics, price), sample) }],
+    prompt: summaryPrompt(input, analysis, scenario, metricsToText(metrics, price), sample),
+    schema: RunSummarySchema,
+    effort: "high",
+    maxTokens: 16000,
   });
-  if (res.stop_reason === "refusal") {
-    throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
-  }
-  if (!res.parsed_output) throw new Error("Síntese inválida.");
-  const s = res.parsed_output;
   s.success_score_after = Math.max(0, Math.min(100, Math.round(s.success_score_after)));
-  return { summary: { ...s, metrics }, usage: usageOf(res, MODEL_ANALYSIS) };
+  return { summary: { ...s, metrics }, usage: usageOf(raw, MODEL_ANALYSIS) };
 }

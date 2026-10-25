@@ -1,6 +1,5 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { PersonaBatchSchema, type Analysis, type BusinessInput, type Persona } from "../types";
-import { anthropic, FALLBACK_BETA, MODEL_SIM, RefusalError, isMockMode } from "./client";
+import { MODEL_SIM, isMockMode, structured } from "./client";
 import { ANALYST_SYSTEM, personaBatchPrompt } from "./prompts";
 import { mockPersonas } from "./mock";
 import { emptyUsage, usageOf, type Usage } from "../pricing";
@@ -44,20 +43,14 @@ async function realBatch(
   count: number,
   plan: { segment: string; count: number }[],
 ): Promise<{ personas: Persona[]; usage: Usage }> {
-  const client = anthropic();
-  const res = await client.beta.messages.parse({
+  const { data, raw } = await structured({
     model: MODEL_SIM,
-    max_tokens: 32000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: zodOutputFormat(PersonaBatchSchema) },
     system: ANALYST_SYSTEM,
-    messages: [{ role: "user", content: personaBatchPrompt(input, analysis, start, count, plan) }],
+    prompt: personaBatchPrompt(input, analysis, start, count, plan),
+    schema: PersonaBatchSchema,
+    effort: "medium",
+    maxTokens: 32000,
   });
-  if (res.stop_reason === "refusal") {
-    throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
-  }
-  if (!res.parsed_output) throw new Error("Lote de personas inválido.");
   // garante idx únicos e dentro do intervalo
-  return { personas: res.parsed_output.personas.slice(0, count).map((p, i) => ({ ...p, idx: start + i })), usage: usageOf(res, MODEL_SIM) };
+  return { personas: data.personas.slice(0, count).map((p, i) => ({ ...p, idx: start + i })), usage: usageOf(raw, MODEL_SIM) };
 }

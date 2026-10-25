@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { AnalysisSchema, type Analysis, type BusinessInput } from "../types";
-import { anthropic, FALLBACK_BETA, MODEL_ANALYSIS, RefusalError, textOf, isMockMode } from "./client";
+import { anthropic, FALLBACK_BETA, MODEL_ANALYSIS, RefusalError, textOf, isMockMode, structured } from "./client";
 import { addUsage, emptyUsage, usageOf, type Usage } from "../pricing";
 import { ANALYST_SYSTEM, analysisPrompt, researchPrompt } from "./prompts";
 import { mockAnalysis, mockResearch } from "./mock";
@@ -66,21 +65,15 @@ export async function analyzeBusiness(input: BusinessInput, research: string | n
     await sleep(1200);
     return { analysis: mockAnalysis(input), usage: emptyUsage("demo") };
   }
-  const client = anthropic();
-  const res = await client.beta.messages.parse({
+  const { data, raw } = await structured({
     model: MODEL_ANALYSIS,
-    max_tokens: 32000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "high", format: zodOutputFormat(AnalysisSchema) },
     system: ANALYST_SYSTEM,
-    messages: [{ role: "user", content: analysisPrompt(input, research) }],
+    prompt: analysisPrompt(input, research),
+    schema: AnalysisSchema,
+    effort: "high",
+    maxTokens: 32000,
   });
-  if (res.stop_reason === "refusal") {
-    throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
-  }
-  if (!res.parsed_output) throw new Error("A análise voltou sem JSON válido. Tente novamente.");
-  return { analysis: normalizeAnalysis(res.parsed_output), usage: usageOf(res, MODEL_ANALYSIS) };
+  return { analysis: normalizeAnalysis(data), usage: usageOf(raw, MODEL_ANALYSIS) };
 }
 
 function normalizeAnalysis(a: Analysis): Analysis {
