@@ -1,5 +1,5 @@
 "use client";
-import { AlertTriangle, TrendingUp, Wrench, ListChecks, Search } from "lucide-react";
+import { AlertTriangle, TrendingUp, Wrench, ListChecks, Search, Clapperboard, Download } from "lucide-react";
 import { useState } from "react";
 import { useProject, useActiveRun } from "@/store/useProject";
 import { Badge, Button, Empty, Gauge, Stat, cx } from "@/components/ui";
@@ -100,6 +100,15 @@ export function OverviewPanel() {
           {showResearch && <pre className="scroll-thin mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-[11px] leading-relaxed text-fg/80">{research}</pre>}
         </div>
       )}
+
+      <div className="rounded-xl border border-white/8 bg-white/4 p-3">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted"><Clapperboard className="size-3.5 text-accent-2" /> Vídeo do resultado</div>
+        <p className="text-[12px] text-muted">Exporte os dados e renderize um filme 3D de 26s com HyperFrames (pasta <code className="text-fg/80">video/</code>): salve como <code className="text-fg/80">video/assets/data.js</code> e rode <code className="text-fg/80">npm run render</code>.</p>
+        <div className="mt-2 flex gap-2">
+          <a href={`/api/projects/${bundle.project.id}/export?format=js`} download className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"><Download className="size-3.5" /> data.js</a>
+          <a href={`/api/projects/${bundle.project.id}/export?format=json`} download className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"><Download className="size-3.5" /> JSON</a>
+        </div>
+      </div>
 
       <Button variant="ghost" size="sm" className="w-full" onClick={() => analyze()} disabled={phase !== "idle"}>Refazer análise</Button>
     </div>

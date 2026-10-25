@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/data.js"></script>
+    <script type="importmap">{ "imports": { "three": "./assets/vendor/three.module.js" } }</script>
+    <style>
+      :root {
+        --ground: #060a13;
+        --ink: #e6edf7;
+        --muted: #8b9bb4;
+        --accent: #38bdf8;
+        --gold: #f5c451;
+        --buy: #34d399;
+        --later: #fbbf24;
+        --reject: #fb7185;
+        --font-display: "Inter", sans-serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--ground); font-family: var(--font-display); color: var(--ink); }
+      #root { position: relative; width: 100%; height: 100%; }
+      #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+      #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,.65) 100%); pointer-events: none; }
+      .clip { position: absolute; inset: 0; }
+      .glass { background: rgba(12, 18, 33, .78); border: 1px solid rgba(148,163,184,.16); border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+      .kicker { display: inline-flex; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 999px; border: 1px solid rgba(56,189,248,.35); background: rgba(56,189,248,.12); color: var(--accent); font-size: 28px; font-weight: 600; letter-spacing: .02em; }
+      .num { font-variant-numeric: tabular-nums; }
+
+      /* intro */
+      #intro-box { position: absolute; left: 192px; top: 300px; width: 1100px; }
+      #intro-title { font-size: 104px; font-weight: 900; line-height: 1.02; letter-spacing: -.03em; margin-top: 26px; }
+      #intro-sub { font-size: 34px; color: var(--muted); margin-top: 22px; font-weight: 500; }
+
+      /* hud over the city */
+      #hud-score { position: absolute; right: 192px; top: 108px; width: 360px; padding: 26px 30px; text-align: center; }
+      #hud-score .v { font-size: 92px; font-weight: 900; line-height: 1; color: var(--gold); }
+      #hud-score .l { font-size: 28px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+      #hud-score .r { font-size: 30px; font-weight: 600; margin-top: 6px; }
+      .chapter { position: absolute; left: 192px; bottom: 130px; width: 1100px; }
+      .chapter .t { font-size: 56px; font-weight: 800; letter-spacing: -.02em; }
+      .chapter .d { font-size: 30px; color: var(--muted); margin-top: 10px; max-width: 980px; line-height: 1.35; }
+      .legend { position: absolute; right: 192px; bottom: 130px; display: flex; gap: 22px; font-size: 28px; color: var(--muted); }
+      .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 999px; margin-right: 8px; }
+      .legend .b::before { background: var(--buy); } .legend .l::before { background: var(--later); } .legend .r::before { background: var(--reject); }
+
+      /* numbers */
+      #numbers-box { position: absolute; left: 192px; top: 150px; width: 1536px; }
+      #numbers-title { font-size: 48px; font-weight: 800; letter-spacing: -.02em; }
+      #stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 28px; }
+      .stat { padding: 26px 30px; }
+      .stat .k { font-size: 28px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+      .stat .v { font-size: 84px; font-weight: 900; line-height: 1.05; }
+      .stat .s { font-size: 28px; color: var(--muted); }
+      #bar { height: 22px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.08); margin-top: 22px; display: flex; }
+      #bar div { height: 100%; }
+      #objections { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+      .obj { padding: 22px 26px; }
+      .obj .q { font-size: 28px; font-weight: 600; line-height: 1.3; }
+      .obj .c { font-size: 28px; color: var(--reject); margin-top: 10px; font-weight: 600; }
+
+      /* verdict */
+      #verdict-box { position: absolute; left: 192px; top: 190px; width: 1536px; }
+      #verdict-head { font-size: 72px; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; max-width: 1400px; }
+      #verdict-text { font-size: 34px; color: var(--muted); margin-top: 28px; line-height: 1.45; max-width: 1400px; }
+      #verdict-adj { margin-top: 34px; display: inline-flex; align-items: center; gap: 14px; padding: 18px 26px; font-size: 28px; font-weight: 600; border-color: rgba(245,196,81,.4); }
+      #verdict-adj b { color: var(--gold); }
+      #brand { position: absolute; left: 192px; bottom: 110px; font-size: 28px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="28" data-fps="30" data-width="1920" data-height="1080">
+      <canvas id="gl" width="1920" height="1080" data-layout-ignore data-hold></canvas>
+      <div id="vignette" data-layout-ignore></div>
+
+      <!-- 1. abertura -->
+      <div id="intro" class="clip" data-start="0" data-duration="4.5" data-track-index="1">
+        <div id="intro-box">
+          <div id="intro-kicker" class="kicker">◈ Founder City · relatório de viabilidade</div>
+          <h1 id="intro-title">Nome do negócio</h1>
+          <div id="intro-sub">segmento · cidade</div>
+        </div>
+      </div>
+
+      <!-- 2. a cidade -->
+      <div id="hud" class="clip" data-start="4.5" data-duration="11.5" data-track-index="2">
+        <div id="hud-score" class="glass">
+          <div id="hud-score-v" class="v num">0</div>
+          <div class="l">Viabilidade</div>
+          <div id="hud-score-r" class="r">—</div>
+        </div>
+        <div id="ch1" class="chapter"><div class="t">O analista avaliou mercado, preço e concorrência</div><div id="ch1-d" class="d"></div></div>
+        <div id="ch2" class="chapter"><div class="t">100 clientes do seu ICP se mudaram para a cidade</div><div id="ch2-d" class="d"></div></div>
+        <div id="ch3" class="chapter"><div class="t">Cada um ouviu a oferta e decidiu</div><div id="ch3-d" class="d"></div></div>
+        <div id="legend" class="legend"><span class="b">comprou</span><span class="l">vai pensar</span><span class="r">recusou</span></div>
+      </div>
+
+      <!-- 3. números -->
+      <div id="numbers" class="clip" data-start="16" data-duration="4.5" data-track-index="3">
+        <div id="numbers-box">
+          <div id="numbers-title">O que 100 clientes fizeram com a oferta</div>
+          <div id="stats">
+            <div class="stat glass"><div class="k">Compram</div><div id="st-buy" class="v num" style="color: var(--buy)">0</div><div id="st-buy-s" class="s"></div></div>
+            <div class="stat glass"><div class="k">Vão pensar</div><div id="st-later" class="v num" style="color: var(--later)">0</div><div id="st-later-s" class="s"></div></div>
+            <div class="stat glass"><div class="k">Recusam</div><div id="st-reject" class="v num" style="color: var(--reject)">0</div><div id="st-reject-s" class="s"></div></div>
+          </div>
+          <div id="bar"><div id="bar-buy" style="background: var(--buy); width: 0%"></div><div id="bar-later" style="background: var(--later); width: 0%"></div><div id="bar-reject" style="background: var(--reject); width: 0%"></div></div>
+          <div id="objections">
+            <div class="obj glass"><div id="obj1" class="q"></div><div id="obj1-c" class="c"></div></div>
+            <div class="obj glass"><div id="obj2" class="q"></div><div id="obj2-c" class="c"></div></div>
+            <div class="obj glass"><div id="obj3" class="q"></div><div id="obj3-c" class="c"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. veredito -->
+      <div id="verdict" class="clip" data-start="20.5" data-duration="7.5" data-track-index="4">
+        <div id="verdict-box">
+          <div id="verdict-kicker" class="kicker">Veredito</div>
+          <h2 id="verdict-head" style="margin-top: 22px"></h2>
+          <p id="verdict-text"></p>
+          <div id="verdict-adj" class="glass">Primeiro ajuste: <b id="verdict-adj-t"></b></div>
+        </div>
+        <div id="brand">Founder City · simulador de viabilidade com IA</div>
+      </div>
+    </div>
+
+    <script>
+      /* ---------- dados ---------- */
+      const D = window.FOUNDER_DATA || {};
+      const P = D.project || { name: "Seu negócio", input: { category: "", model: "online", location: {}, price: 0 } };
+      const A = D.analysis ? D.analysis.data : null;
+      const RUN = (D.runs || []).filter((r) => r.status === "done").slice(-1)[0] || (D.runs || []).slice(-1)[0] || null;
+      const RES = RUN ? RUN.results || [] : [];
+      const PERSONAS = D.personas || [];
+      const M = RUN ? RUN.metrics || (RUN.summary && RUN.summary.metrics) || null : null;
+      const scoreA = A ? A.verdict.success_score : 0;
+      const scoreS = RUN && RUN.summary ? RUN.summary.success_score_after : null;
+      const SCORE = Math.round(scoreS === null ? scoreA : scoreA * 0.4 + scoreS * 0.6);
+      const rating = SCORE < 35 ? "Inviável" : SCORE < 55 ? "Arriscado" : SCORE < 75 ? "Promissor" : "Forte";
+      const brl = (v) => "R$ " + Math.round(v).toLocaleString("pt-BR");
+      const txt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      const loc = P.input.model === "online" ? "online" : [P.input.location.neighborhood, P.input.location.city].filter(Boolean).join(", ");
+      txt("intro-title", P.name);
+      txt("intro-sub", [P.input.category, loc].filter(Boolean).join(" · "));
+      txt("hud-score-r", rating);
+      txt("ch1-d", A ? A.verdict.headline : "");
+      txt("ch2-d", A ? `ICP: ${A.icp.name}` : "");
+      const buy = M ? M.buy : 0, later = M ? M.later : 0, reject = M ? M.reject : 0, total = M ? M.total : 100;
+      txt("ch3-d", M ? `${buy} compraram, ${later} vão pensar e ${reject} recusaram a ${brl(RUN.config.price_override || P.input.price)}.` : "");
+      txt("st-buy-s", M ? `${Math.round((buy / total) * 100)}% · ticket médio ${brl(M.avg_wtp)}` : "");
+      txt("st-later-s", M ? `${Math.round((later / total) * 100)}% · demanda latente` : "");
+      txt("st-reject-s", M ? `${Math.round((reject / total) * 100)}% · teto mediano ${brl(M.median_max_price)}` : "");
+      const objs = (RUN && RUN.summary ? RUN.summary.top_objections : (M ? M.objections : [])).slice(0, 3);
+      objs.forEach((o, i) => { txt(`obj${i + 1}`, `“${o.objection}”`); txt(`obj${i + 1}-c`, `${o.count} clientes`); });
+      txt("verdict-head", RUN && RUN.summary ? RUN.summary.headline : A ? A.verdict.headline : "");
+      const shortText = (v) => { const sents = String(v || "").replace(/\(S[ií]ntese[^)]*\)/g, "").split(/(?<=[.!?])\s+/).filter(Boolean); let out = ""; for (const sn of sents) { if ((out + " " + sn).trim().split(/\s+/).length > 34) break; out = (out + " " + sn).trim(); } return out || sents[0] || ""; };
+      txt("verdict-text", shortText(RUN && RUN.summary ? RUN.summary.verdict : A ? A.verdict.reasoning : ""));
+      const adj = (RUN && RUN.summary ? RUN.summary.adjustments : A ? A.verdict.adjustments : [])[0];
+      txt("verdict-adj-t", adj ? `${adj.title} (+${adj.expected_score_delta} pts)` : "—");
+
+      /* ---------- timeline GSAP (overlays) ---------- */
+      const tl = gsap.timeline({ paused: true });
+      const EASE = "power3.out";
+      // intro
+      tl.fromTo("#intro-kicker", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: EASE }, 0.2);
+      tl.fromTo("#intro-title", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, 0.45);
+      tl.fromTo("#intro-sub", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7, ease: EASE }, 0.75);
+      tl.to("#intro-box", { opacity: 0, y: -30, duration: 0.5, ease: "power2.in" }, 3.9);
+      // hud (clip starts at 4.5)
+      tl.fromTo("#hud-score", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, 5.2);
+      const counter = { v: 0 };
+      tl.to(counter, { v: SCORE, duration: 2.2, ease: "power2.out", onUpdate: () => txt("hud-score-v", Math.round(counter.v)) }, 5.4);
+      const chapters = [["#ch1", 4.6, 7.8], ["#ch2", 8.2, 11.3], ["#ch3", 11.7, 15.7]];
+      for (const [sel, a, b] of chapters) {
+        tl.fromTo(sel, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE }, a);
+        tl.to(sel, { opacity: 0, y: -16, duration: 0.35, ease: "power2.in" }, b);
+      }
+      tl.fromTo("#legend", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 11.9);
+      tl.to("#hud-score", { opacity: 0, duration: 0.4 }, 15.6);
+      tl.to("#legend", { opacity: 0, duration: 0.4 }, 15.6);
+      // numbers (clip starts at 16)
+      tl.fromTo("#numbers-title", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE }, 16.1);
+      tl.fromTo("#stats > .stat", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE, stagger: 0.12 }, 16.3);
+      const cnt = { b: 0, l: 0, r: 0 };
+      tl.to(cnt, { b: buy, l: later, r: reject, duration: 1.4, ease: "power2.out", onUpdate: () => { txt("st-buy", Math.round(cnt.b)); txt("st-later", Math.round(cnt.l)); txt("st-reject", Math.round(cnt.r)); } }, 16.5);
+      tl.to("#bar-buy", { width: `${(buy / total) * 100}%`, duration: 1.2, ease: "power2.out" }, 16.6);
+      tl.to("#bar-later", { width: `${(later / total) * 100}%`, duration: 1.2, ease: "power2.out" }, 16.6);
+      tl.to("#bar-reject", { width: `${(reject / total) * 100}%`, duration: 1.2, ease: "power2.out" }, 16.6);
+      tl.fromTo("#objections > .obj", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE, stagger: 0.14 }, 17.6);
+      tl.to("#numbers-box", { opacity: 0, y: -20, duration: 0.4, ease: "power2.in" }, 20.05);
+      // verdict (clip starts at 21.5)
+      tl.fromTo("#verdict-kicker", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE }, 20.6);
+      tl.fromTo("#verdict-head", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7, ease: EASE }, 20.8);
+      tl.fromTo("#verdict-text", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: EASE }, 21.3);
+      tl.fromTo("#verdict-adj", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: EASE }, 21.9);
+      tl.fromTo("#brand", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 22.2);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+
+    <script type="module">
+      /* ---------- cidade 3D (Three.js), desenhada a partir do tempo ---------- */
+      import * as THREE from "three";
+      const D = window.FOUNDER_DATA || {};
+      const A = D.analysis ? D.analysis.data : null;
+      const RUN = (D.runs || []).filter((r) => r.status === "done").slice(-1)[0] || (D.runs || []).slice(-1)[0] || null;
+      const RES = new Map((RUN ? RUN.results || [] : []).map((r) => [r.persona_idx, r]));
+      const PERSONAS = (D.personas || []).slice(0, 100);
+      const scoreA = A ? A.verdict.success_score : 40;
+      const scoreS = RUN && RUN.summary ? RUN.summary.success_score_after : null;
+      const SCORE = Math.round(scoreS === null ? scoreA : scoreA * 0.4 + scoreS * 0.6);
+
+      const hash = (n, salt = 0) => { let x = (n + 1) * 374761393 + salt * 668265263; x = (x ^ (x >>> 13)) * 1274126177; x = x ^ (x >>> 16); return ((x >>> 0) % 100000) / 100000; };
+      const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+      const smooth = (t) => t * t * (3 - 2 * t);
+      const ease = (t0, t1, t) => smooth(clamp((t - t0) / (t1 - t0), 0, 1));
+      const DISTRICT_COLORS = ["#2dd4bf", "#a78bfa", "#f472b6", "#fb923c", "#60a5fa", "#facc15"];
+
+      const canvas = document.getElementById("gl");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(1920, 1080, false);
+      renderer.shadowMap.enabled = true;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color("#060a13");
+      scene.fog = new THREE.Fog("#060a13", 120, 260);
+      const camera = new THREE.PerspectiveCamera(22, 1920 / 1080, 1, 500);
+
+      scene.add(new THREE.AmbientLight("#ffffff", 0.35));
+      scene.add(new THREE.HemisphereLight("#3b4f8a", "#0b1020", 0.55));
+      const sun = new THREE.DirectionalLight("#ffd9a8", 1.35);
+      sun.position.set(22, 34, 14);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40 });
+      sun.shadow.bias = -0.0004;
+      scene.add(sun);
+
+      // chão, grade, avenidas, praça
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ color: "#0b1324", roughness: 1 }));
+      ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; scene.add(ground);
+      const grid = new THREE.GridHelper(160, 80, "#233566", "#172243"); grid.position.y = 0.005; scene.add(grid);
+      const roadMat = new THREE.MeshStandardMaterial({ color: "#121c33", roughness: 0.9 });
+      for (const rot of [0, Math.PI / 2]) { const r = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 72), roadMat); r.rotation.set(-Math.PI / 2, 0, rot); r.position.y = 0.01; r.receiveShadow = true; scene.add(r); }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(9.4, 11.6, 96), roadMat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; scene.add(ring);
+      const plaza = new THREE.Mesh(new THREE.CircleGeometry(7.6, 64), new THREE.MeshStandardMaterial({ color: "#141f3a", roughness: 0.95 })); plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.015; plaza.receiveShadow = true; scene.add(plaza);
+      const plazaRing = new THREE.Mesh(new THREE.RingGeometry(7.4, 7.65, 64), new THREE.MeshBasicMaterial({ color: "#38bdf8", transparent: true, opacity: 0.55 })); plazaRing.rotation.x = -Math.PI / 2; plazaRing.position.y = 0.02; scene.add(plazaRing);
+
+      // bairros
+      const segNames = A ? A.icp.segments.map((s) => s.name) : [...new Set(PERSONAS.map((p) => p.segment))];
+      const names = segNames.length ? segNames : ["Clientes"];
+      const districts = names.map((name, index) => {
+        const a = (index / names.length) * Math.PI * 2 + Math.PI / 6;
+        const share = A && A.icp.segments[index] ? A.icp.segments[index].share_pct : 100 / names.length;
+        const radius = 4 + Math.sqrt(share) * 0.55;
+        const color = DISTRICT_COLORS[index % DISTRICT_COLORS.length];
+        const cx = Math.cos(a) * 24, cz = Math.sin(a) * 24;
+        const disc = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.12, roughness: 1 }));
+        disc.rotation.x = -Math.PI / 2; disc.position.set(cx, 0.013, cz); scene.add(disc);
+        const rim = new THREE.Mesh(new THREE.RingGeometry(radius - 0.12, radius, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 }));
+        rim.rotation.x = -Math.PI / 2; rim.position.set(cx, 0.02, cz); scene.add(rim);
+        return { name, cx, cz, radius };
+      });
+
+      // sede
+      const S = 6;
+      const base = new THREE.Mesh(new THREE.BoxGeometry(S + 1.6, 0.4, S + 1.6), new THREE.MeshStandardMaterial({ color: "#1e293b", roughness: 0.8 })); base.position.y = 0.2; base.castShadow = base.receiveShadow = true; scene.add(base);
+      const hqColor = SCORE < 35 ? "#7f1d1d" : SCORE < 55 ? "#78350f" : SCORE < 75 ? "#1e3a5f" : "#064e3b";
+      const tower = new THREE.Group(); tower.position.y = 0.4; scene.add(tower);
+      const towerMesh = new THREE.Mesh(new THREE.BoxGeometry(S, 10, S), new THREE.MeshStandardMaterial({ color: hqColor, roughness: 0.55, metalness: 0.25 })); towerMesh.position.y = 5; towerMesh.castShadow = towerMesh.receiveShadow = true; tower.add(towerMesh);
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(S + 0.3, 0.1, S + 0.3), new THREE.MeshStandardMaterial({ color: "#38bdf8", emissive: "#38bdf8", emissiveIntensity: 1.6 })); crown.position.y = 10.05; tower.add(crown);
+      const H_FULL = 5 + (SCORE / 100) * 13;
+      const winData = [];
+      for (let f = 0; f < 4; f++) for (let r = 0; r < 18; r++) for (let c = 0; c < 6; c++) {
+        const x = (c - 2.5) * (S / 6) * 0.9, y = 0.9 + r * 0.95;
+        const px = f % 2 === 0 ? x : (f === 1 ? 1 : -1) * (S / 2 + 0.01);
+        const pz = f % 2 === 0 ? (f === 0 ? 1 : -1) * (S / 2 + 0.01) : x;
+        winData.push({ x: px, y, z: pz, rot: (f * Math.PI) / 2, lit: (r * 7 + c * 13 + f * 3) % 10 });
+      }
+      const windows = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.34, 0.42), new THREE.MeshStandardMaterial({ color: "#fde68a", emissive: "#fbbf24", emissiveIntensity: 1.15, side: THREE.DoubleSide }), winData.length);
+      scene.add(windows);
+      const glow = new THREE.PointLight("#7dd3fc", 2, 30, 1.6); glow.position.set(0, H_FULL + 2, 0); scene.add(glow);
+
+      // concorrentes
+      const comps = A ? A.competitors : [];
+      comps.forEach((c, i) => {
+        const a = (i / Math.max(1, comps.length)) * Math.PI * 2 + Math.PI / 4 + 0.3;
+        const r = 15 + (i % 2) * 2.5;
+        const h = 1.6 + c.strength * 1.7, w = 2.2 + (c.type === "direto" ? 1 : 0.4);
+        const col = c.threat_level >= 4 ? "#7f1d1d" : c.threat_level === 3 ? "#5b2a86" : "#1f2a44";
+        const edge = c.threat_level >= 4 ? "#fb7185" : c.threat_level === 3 ? "#c084fc" : "#64748b";
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, metalness: 0.15 }));
+        m.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r); m.castShadow = m.receiveShadow = true; scene.add(m);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.15, 0.08, w + 0.15), new THREE.MeshStandardMaterial({ color: edge, emissive: edge, emissiveIntensity: 0.9 }));
+        top.position.set(Math.cos(a) * r, h + 0.04, Math.sin(a) * r); scene.add(top);
+      });
+
+      // nuvens de ameaça
+      const clouds = (A ? A.threats : []).slice(0, 7).map((t, i, arr) => {
+        const g = new THREE.Group();
+        const col = t.severity >= 4 ? "#1f1530" : "#1c2438";
+        for (const [x, y, z, s] of [[0, 0, 0, 1.6], [1.4, 0.3, 0.4, 1.2], [-1.3, 0.2, -0.3, 1.25], [0.5, 0.7, -0.9, 1.0], [-0.4, 0.6, 0.9, 1.05]]) {
+          const m = new THREE.Mesh(new THREE.SphereGeometry(s, 14, 12), new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.25 + t.probability * 0.1, roughness: 1 }));
+          m.position.set(x, y, z); g.add(m);
+        }
+        g.scale.setScalar(0.9 + t.severity * 0.35);
+        scene.add(g);
+        return { g, a0: (i / arr.length) * Math.PI * 2 + 0.9, r: 27 + hash(i, 9) * 6, y: 15 + t.severity * 1.1 };
+      });
+
+      // moradores
+      const N = PERSONAS.length;
+      const bodyGeo = new THREE.CapsuleGeometry(0.22, 0.45, 4, 10), headGeo = new THREE.SphereGeometry(0.2, 12, 10), hairGeo = new THREE.SphereGeometry(0.21, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), ringGeo = new THREE.RingGeometry(0.32, 0.46, 24);
+      const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.7 }), Math.max(1, N));
+      const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshStandardMaterial({ roughness: 0.6 }), Math.max(1, N));
+      const hairs = new THREE.InstancedMesh(hairGeo, new THREE.MeshStandardMaterial({ roughness: 0.9 }), Math.max(1, N));
+      const rings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, side: THREE.DoubleSide }), Math.max(1, N));
+      bodies.castShadow = true;
+      for (const m of [bodies, heads, hairs, rings]) { m.frustumCulled = false; scene.add(m); }
+      const DC = { compra: "#34d399", depois: "#fbbf24", nao_compra: "#fb7185" };
+      const safe = (c, f) => (c && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) ? c : f);
+      const col = new THREE.Color();
+      const agents = PERSONAS.map((p, i) => {
+        const d = districts.find((x) => x.name === p.segment) || districts[p.idx % districts.length];
+        const ang = hash(p.idx, 1) * Math.PI * 2, rad = Math.sqrt(hash(p.idx, 2)) * d.radius * 0.9;
+        const home = [d.cx + Math.cos(ang) * rad, d.cz + Math.sin(ang) * rad];
+        const r = RES.get(p.idx); const dec = r ? r.decision : null;
+        const a2 = hash(p.idx, 11) * Math.PI * 2;
+        let dest = home;
+        if (dec === "compra") { const rr = 4.8 + hash(p.idx, 12) * 2; dest = [Math.cos(a2) * rr, Math.sin(a2) * rr]; }
+        else if (dec === "depois") { const rr = 9.5 + hash(p.idx, 12) * 2.5; dest = [Math.cos(a2) * rr, Math.sin(a2) * rr]; }
+        else if (dec === "nao_compra") { const dir = Math.atan2(home[1], home[0]) + (hash(p.idx, 13) - 0.5) * 0.8; const rr = 28 + hash(p.idx, 14) * 5; dest = [Math.cos(dir) * rr, Math.sin(dir) * rr]; }
+        bodies.setColorAt(i, col.set(safe(p.avatar && p.avatar.shirt, "#64748b")));
+        heads.setColorAt(i, col.set(safe(p.avatar && p.avatar.skin, "#e0ac69")));
+        hairs.setColorAt(i, col.set(safe(p.avatar && p.avatar.hair, "#1c1917")));
+        rings.setColorAt(i, col.set(dec ? DC[dec] : "#000000"));
+        return { idx: p.idx, home, dest, dec, spawn: 8.3 + hash(p.idx, 3) * 2.6, go: 11.8 + hash(p.idx, 4) * 2.4, travel: 1.4 + hash(p.idx, 5) * 1.2, bob: hash(p.idx, 9) * Math.PI * 2 };
+      });
+
+      /* ---------- câmera: keyframes (t, distância, altura, ângulo) ---------- */
+      const CAM = [
+        [0, 118, 78, 0.78], [4.5, 112, 74, 0.86], [8, 66, 44, 1.05], [11.5, 62, 40, 1.5], [16, 44, 27, 1.95], [20.5, 56, 36, 2.3], [28, 98, 66, 2.65],
+      ];
+      function camAt(t) {
+        let i = 0; while (i < CAM.length - 2 && t > CAM[i + 1][0]) i++;
+        const a = CAM[i], b = CAM[i + 1]; const k = smooth(clamp((t - a[0]) / (b[0] - a[0]), 0, 1));
+        return [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k];
+      }
+      const dummy = new THREE.Object3D();
+
+      function renderAt(t) {
+        // sede cresce (4.5 → 7.2), janelas acendem (6 → 9)
+        const grow = ease(4.6, 7.4, t);
+        const h = 0.6 + (H_FULL - 0.6) * (1 - Math.pow(1 - grow, 3));
+        tower.scale.set(1, h / 10, 1);
+        const litRatio = (0.15 + (SCORE / 100) * 0.55) * ease(6, 9, t);
+        winData.forEach((w, i) => {
+          const visible = w.y < h - 0.4, lit = visible && w.lit / 10 < litRatio;
+          dummy.position.set(w.x, visible ? w.y : -5, w.z); dummy.rotation.set(0, w.rot, 0); dummy.scale.setScalar(lit ? 1 : 0.0001); dummy.updateMatrix(); windows.setMatrixAt(i, dummy.matrix);
+        });
+        windows.instanceMatrix.needsUpdate = true;
+        glow.intensity = (0.4 + (SCORE / 100) * 6) * ease(5, 8, t) + Math.sin(t * 1.5) * 0.3;
+        // nuvens
+        for (const c of clouds) { const a = c.a0 + t * 0.012; c.g.position.set(Math.cos(a) * c.r, c.y + Math.sin(t * 0.5) * 0.4, Math.sin(a) * c.r); c.g.visible = t > 5.2; }
+        // moradores
+        for (let i = 0; i < agents.length; i++) {
+          const a = agents[i];
+          const appear = ease(a.spawn, a.spawn + 0.5, t);
+          const k = a.dec ? ease(a.go, a.go + a.travel, t) : 0;
+          const x = a.home[0] + (a.dest[0] - a.home[0]) * k, z = a.home[1] + (a.dest[1] - a.home[1]) * k;
+          const moving = k > 0 && k < 1;
+          const bob = moving ? Math.abs(Math.sin(t * 9 + a.bob)) * 0.12 : Math.sin(t * 2 + a.bob) * 0.02;
+          const face = moving ? Math.atan2(a.dest[0] - a.home[0], a.dest[1] - a.home[1]) : a.bob;
+          const s = appear * (1 - Math.pow(1 - appear, 2)) || 0.0001;
+          dummy.position.set(x, 0.45 + bob, z); dummy.rotation.set(0, face, 0); dummy.scale.setScalar(s); dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
+          dummy.position.set(x, 1.05 * s + bob, z); dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
+          dummy.position.set(x, 1.18 * s + bob, z); dummy.scale.set(s, s * 0.6, s); dummy.updateMatrix(); hairs.setMatrixAt(i, dummy.matrix);
+          const rs = a.dec && k >= 1 ? ease(a.go + a.travel, a.go + a.travel + 0.4, t) * (1 + Math.sin(t * 3 + a.bob) * 0.05) : 0.0001;
+          dummy.position.set(x, 0.03, z); dummy.rotation.set(-Math.PI / 2, 0, 0); dummy.scale.setScalar(rs || 0.0001); dummy.updateMatrix(); rings.setMatrixAt(i, dummy.matrix);
+        }
+        for (const m of [bodies, heads, hairs, rings]) m.instanceMatrix.needsUpdate = true;
+        // câmera
+        const [dist, height, ang] = camAt(t);
+        const targetY = 2 + ease(4.5, 8, t) * 4;
+        camera.position.set(Math.cos(ang) * dist, height, Math.sin(ang) * dist);
+        camera.lookAt(0, targetY, 0);
+        renderer.render(scene, camera);
+      }
+
+      for (const m of [bodies, heads, hairs, rings]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      window.addEventListener("hf-seek", (e) => renderAt(e.detail.time));
+      renderAt(0);
+      window.__hf = window.__hf || {};
+      window.__hf.buildReady = window.__hf.buildReady || {};
+      window.__hf.buildReady.city = Promise.resolve();
+    </script>
+  </body>
+</html>

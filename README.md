@@ -12,9 +12,19 @@ Funde seu negócio numa cidade 3D isométrica antes de arriscar dinheiro de verd
 
 **Cidade 3D** — a sede sobe com o score e acende janelas conforme a viabilidade; concorrentes viram prédios (altura = força, cor = ameaça); ameaças viram nuvens de tempestade; bairros são os segmentos do ICP; os 100 clientes caminham até a sede (compram), orbitam (pensando) ou vão embora (recusam). Clique numa pessoa para ver a persona e o raciocínio dela.
 
+## Vídeo do resultado (HyperFrames + Three.js)
+
+A pasta `video/` é um projeto [HyperFrames](https://github.com/heygen-com/hyperframes): um filme de 28 s, 1920×1080, com a cidade 3D em Three.js desenhada quadro a quadro (determinístico) e overlays em GSAP: abertura, sede subindo com o score, 100 clientes se mudando e decidindo, números, objeções e veredito.
+
+1. Na aba **Visão geral** do projeto, clique em **data.js** (exporta análise, personas e simulação).
+2. Salve o arquivo como `video/assets/data.js` (há um exemplo do modo demonstração lá).
+3. `cd video && npm run check` (lint + validação) e `npm run render` (MP4 em `video/renders/`). Precisa de FFmpeg; `-q draft` para um preview rápido.
+
+`npm run dev` dentro de `video/` abre o preview com timeline.
+
 ## Stack
 
-Next.js 16 (App Router) · React Three Fiber + drei + postprocessing · Anthropic SDK (structured outputs, web search) · Supabase (persistência via RPC com RLS) · Zustand · Tailwind v4 · Recharts.
+Next.js 16 (App Router) · React Three Fiber + drei + postprocessing · Anthropic SDK (structured outputs, web search) · Supabase (persistência via RPC com RLS) · Zustand · Tailwind v4 · Recharts · HyperFrames + Three.js (vídeo).
 
 ## Rodando
 
