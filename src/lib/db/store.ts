@@ -1,5 +1,6 @@
 import type { Analysis, BusinessInput, Persona, ProjectBundle, ProjectListItem, ProjectStatus, Run, RunMetrics, RunSummary, ScenarioConfig, SimResult } from "../types";
 import { hasSupabase, supabase } from "./supabase";
+import { getStore as getBlobStore } from "@netlify/blobs";
 
 /* Toda persistência passa pelo owner token (cookie anônimo). No Supabase, as tabelas têm RLS
    sem políticas diretas e são acessadas só pelas funções sim_* (security definer) que validam o token. */
@@ -154,6 +155,112 @@ class MemoryStore implements Store {
   }
 }
 
+/* Netlify Blobs: persistência durável quando o app roda na Netlify (sem depender do Supabase). */
+export function hasNetlifyBlobs(): boolean {
+  return process.env.NETLIFY === "true" || Boolean(process.env.NETLIFY_BLOBS_CONTEXT);
+}
+
+class BlobsStore implements Store {
+  private blobs() {
+    return getBlobStore({ name: "founder-city", consistency: "strong" });
+  }
+  private async readBundle(id: string): Promise<{ token: string; bundle: ProjectBundle } | null> {
+    return ((await this.blobs().get(`p/${id}`, { type: "json" })) as { token: string; bundle: ProjectBundle } | null) ?? null;
+  }
+  private async writeBundle(id: string, token: string, bundle: ProjectBundle) {
+    await this.blobs().setJSON(`p/${id}`, { token, bundle });
+  }
+  private async own(token: string, id: string) {
+    const m = await this.readBundle(id);
+    if (!m || m.token !== token) throw new NotFoundError();
+    return m;
+  }
+  private async index(token: string): Promise<string[]> {
+    return ((await this.blobs().get(`o/${token}`, { type: "json" })) as string[] | null) ?? [];
+  }
+  async createProject(token: string, name: string, input: BusinessInput) {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await this.writeBundle(id, token, { project: { id, name, status: "draft", input, created_at: now, updated_at: now }, analysis: null, personas: [], runs: [] });
+    const ids = await this.index(token);
+    await this.blobs().setJSON(`o/${token}`, [id, ...ids.filter((x) => x !== id)]);
+    return id;
+  }
+  async listProjects(token: string) {
+    const ids = await this.index(token);
+    const items = await Promise.all(ids.map((id) => this.readBundle(id)));
+    return items
+      .filter((m): m is { token: string; bundle: ProjectBundle } => Boolean(m && m.token === token))
+      .map((m) => ({ ...m.bundle.project, score: m.bundle.analysis?.data.verdict.success_score ?? null, runs: m.bundle.runs.length }))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
+  async getProject(token: string, id: string) {
+    const m = await this.readBundle(id);
+    return m && m.token === token ? m.bundle : null;
+  }
+  async updateProject(token: string, id: string, patch: { status?: ProjectStatus; input?: BusinessInput; name?: string }) {
+    const m = await this.own(token, id);
+    Object.assign(m.bundle.project, { ...patch, updated_at: new Date().toISOString() });
+    await this.writeBundle(id, token, m.bundle);
+  }
+  async deleteProject(token: string, id: string) {
+    await this.own(token, id);
+    await this.blobs().delete(`p/${id}`);
+    const ids = await this.index(token);
+    await this.blobs().setJSON(`o/${token}`, ids.filter((x) => x !== id));
+  }
+  async saveAnalysis(token: string, projectId: string, data: Analysis, research: string | null, model: string) {
+    const m = await this.own(token, projectId);
+    const aid = crypto.randomUUID();
+    m.bundle.analysis = { id: aid, data, research, model, created_at: new Date().toISOString() };
+    m.bundle.project.status = "analyzed";
+    m.bundle.project.updated_at = new Date().toISOString();
+    await this.writeBundle(projectId, token, m.bundle);
+    return aid;
+  }
+  async savePersonas(token: string, projectId: string, personas: Persona[]) {
+    const m = await this.own(token, projectId);
+    m.bundle.personas = [...personas].sort((a, b) => a.idx - b.idx);
+    m.bundle.project.status = "personas";
+    m.bundle.project.updated_at = new Date().toISOString();
+    await this.writeBundle(projectId, token, m.bundle);
+  }
+  async createRun(token: string, projectId: string, config: ScenarioConfig) {
+    const m = await this.own(token, projectId);
+    const id = crypto.randomUUID();
+    m.bundle.runs.push({ id, label: config.label, config, status: "running", summary: null, results: [], created_at: new Date().toISOString(), finished_at: null });
+    m.bundle.project.status = "simulating";
+    await this.writeBundle(projectId, token, m.bundle);
+    return `${projectId}:${id}`;
+  }
+  private split(runId: string): [string, string] {
+    const i = runId.indexOf(":");
+    return [runId.slice(0, i), runId.slice(i + 1)];
+  }
+  async saveResults(token: string, runId: string, results: SimResult[]) {
+    const [pid, rid] = this.split(runId);
+    const m = await this.own(token, pid);
+    const run = m.bundle.runs.find((r) => r.id === rid);
+    if (!run) throw new NotFoundError();
+    const byIdx = new Map(run.results.map((r) => [r.persona_idx, r]));
+    for (const r of results) byIdx.set(r.persona_idx, r);
+    run.results = [...byIdx.values()].sort((a, b) => a.persona_idx - b.persona_idx);
+    await this.writeBundle(pid, token, m.bundle);
+  }
+  async finishRun(token: string, runId: string, summary: (RunSummary & { metrics: RunMetrics }) | null, status: Run["status"]) {
+    const [pid, rid] = this.split(runId);
+    const m = await this.own(token, pid);
+    const run = m.bundle.runs.find((r) => r.id === rid);
+    if (!run) throw new NotFoundError();
+    run.summary = summary ?? run.summary;
+    run.status = status;
+    run.finished_at = new Date().toISOString();
+    if (status === "done") m.bundle.project.status = "simulated";
+    m.bundle.project.updated_at = new Date().toISOString();
+    await this.writeBundle(pid, token, m.bundle);
+  }
+}
+
 export class NotFoundError extends Error {
   constructor() {
     super("not_found");
@@ -164,7 +271,7 @@ export class NotFoundError extends Error {
    (com aviso) em vez de derrubar o app. */
 class ResilientStore implements Store {
   private primary: Store = new SupabaseStore();
-  private fallback: Store = new MemoryStore();
+  private fallback: Store = hasNetlifyBlobs() ? new BlobsStore() : new MemoryStore();
   degraded = false;
   private async run<T>(fn: (s: Store) => Promise<T>): Promise<T> {
     if (this.degraded) return fn(this.fallback);
@@ -172,7 +279,7 @@ class ResilientStore implements Store {
       return await fn(this.primary);
     } catch (e) {
       if (e instanceof SchemaMissingError) {
-        console.warn(`[store] ${e.message} Usando memória até a migração ser aplicada.`);
+        console.warn(`[store] ${e.message} Usando ${hasNetlifyBlobs() ? "Netlify Blobs" : "memória"} até a migração ser aplicada.`);
         this.degraded = true;
         return fn(this.fallback);
       }
@@ -194,13 +301,14 @@ class ResilientStore implements Store {
 const g2 = globalThis as unknown as { __simStore?: Store };
 export function getStore(): Store {
   if (!g2.__simStore) {
-    g2.__simStore = hasSupabase() ? new ResilientStore() : new MemoryStore();
-    if (!hasSupabase()) console.warn("[store] Supabase não configurado: usando memória (dados não persistem).");
+    g2.__simStore = hasSupabase() ? new ResilientStore() : hasNetlifyBlobs() ? new BlobsStore() : new MemoryStore();
+    if (!hasSupabase() && !hasNetlifyBlobs()) console.warn("[store] Supabase não configurado: usando memória (dados não persistem).");
   }
   return g2.__simStore;
 }
-export const storageMode = (): "supabase" | "memory" => {
-  if (!hasSupabase()) return "memory";
+export const storageMode = (): "supabase" | "blobs" | "memory" => {
   const s = g2.__simStore;
-  return s instanceof ResilientStore && s.degraded ? "memory" : "supabase";
+  if (s instanceof ResilientStore) return s.degraded ? (hasNetlifyBlobs() ? "blobs" : "memory") : "supabase";
+  if (hasSupabase()) return "supabase";
+  return hasNetlifyBlobs() ? "blobs" : "memory";
 };

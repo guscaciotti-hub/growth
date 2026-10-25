@@ -47,7 +47,7 @@ export function ProjectList() {
         {mode && (
           <div className="flex gap-1.5">
             <Badge tone={mode.ai === "live" ? "accent" : "later"}>{mode.ai === "live" ? "IA ao vivo" : "modo demonstração"}</Badge>
-            <Badge tone={mode.storage === "supabase" ? "buy" : "neutral"}>{mode.storage === "supabase" ? "salvo na nuvem" : "memória local"}</Badge>
+            <Badge tone={mode.storage === "memory" ? "neutral" : "buy"}>{mode.storage === "memory" ? "memória local" : "salvo na nuvem"}</Badge>
           </div>
         )}
       </div>
