@@ -160,15 +160,32 @@ export function hasNetlifyBlobs(): boolean {
   return process.env.NETLIFY === "true" || Boolean(process.env.NETLIFY_BLOBS_CONTEXT);
 }
 
+export class BlobsUnavailableError extends Error {
+  constructor(msg: string) {
+    super(`Netlify Blobs indisponível: ${msg}`);
+  }
+}
+async function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([p, new Promise<T>((_, rej) => { t = setTimeout(() => rej(new BlobsUnavailableError(`${what} excedeu ${ms}ms`)), ms); })]);
+  } catch (e) {
+    if (e instanceof BlobsUnavailableError || e instanceof NotFoundError) throw e;
+    throw new BlobsUnavailableError(e instanceof Error ? e.message : String(e));
+  } finally {
+    if (t) clearTimeout(t);
+  }
+}
+
 class BlobsStore implements Store {
   private blobs() {
     return getBlobStore({ name: "founder-city", consistency: "strong" });
   }
   private async readBundle(id: string): Promise<{ token: string; bundle: ProjectBundle } | null> {
-    return ((await this.blobs().get(`p/${id}`, { type: "json" })) as { token: string; bundle: ProjectBundle } | null) ?? null;
+    return ((await withTimeout(this.blobs().get(`p/${id}`, { type: "json" }), 8000, "leitura")) as { token: string; bundle: ProjectBundle } | null) ?? null;
   }
   private async writeBundle(id: string, token: string, bundle: ProjectBundle) {
-    await this.blobs().setJSON(`p/${id}`, { token, bundle });
+    await withTimeout(this.blobs().setJSON(`p/${id}`, { token, bundle }), 8000, "gravação");
   }
   private async own(token: string, id: string) {
     const m = await this.readBundle(id);
@@ -176,7 +193,7 @@ class BlobsStore implements Store {
     return m;
   }
   private async index(token: string): Promise<string[]> {
-    return ((await this.blobs().get(`o/${token}`, { type: "json" })) as string[] | null) ?? [];
+    return ((await withTimeout(this.blobs().get(`o/${token}`, { type: "json" }), 8000, "índice")) as string[] | null) ?? [];
   }
   async createProject(token: string, name: string, input: BusinessInput) {
     const id = crypto.randomUUID();
@@ -270,20 +287,25 @@ export class NotFoundError extends Error {
 /* Se o Supabase está configurado mas o esquema não foi migrado, cai para memória
    (com aviso) em vez de derrubar o app. */
 class ResilientStore implements Store {
-  private primary: Store = new SupabaseStore();
-  private fallback: Store = hasNetlifyBlobs() ? new BlobsStore() : new MemoryStore();
-  degraded = false;
+  private chain: Store[] = [...(hasSupabase() ? [new SupabaseStore()] : []), ...(hasNetlifyBlobs() ? [new BlobsStore()] : []), new MemoryStore()];
+  private level = 0;
+  get degraded() {
+    return this.level > 0;
+  }
+  get mode(): "supabase" | "blobs" | "memory" {
+    const s = this.chain[this.level];
+    return s instanceof SupabaseStore ? "supabase" : s instanceof BlobsStore ? "blobs" : "memory";
+  }
   private async run<T>(fn: (s: Store) => Promise<T>): Promise<T> {
-    if (this.degraded) return fn(this.fallback);
-    try {
-      return await fn(this.primary);
-    } catch (e) {
-      if (e instanceof SchemaMissingError) {
-        console.warn(`[store] ${e.message} Usando ${hasNetlifyBlobs() ? "Netlify Blobs" : "memória"} até a migração ser aplicada.`);
-        this.degraded = true;
-        return fn(this.fallback);
+    for (;;) {
+      try {
+        return await fn(this.chain[this.level]);
+      } catch (e) {
+        const canFall = this.level < this.chain.length - 1 && (e instanceof SchemaMissingError || e instanceof BlobsUnavailableError);
+        if (!canFall) throw e;
+        console.warn(`[store] ${e.message} Caindo para o próximo armazenamento.`);
+        this.level++;
       }
-      throw e;
     }
   }
   createProject(t: string, n: string, i: BusinessInput) { return this.run((s) => s.createProject(t, n, i)); }
@@ -301,14 +323,12 @@ class ResilientStore implements Store {
 const g2 = globalThis as unknown as { __simStore?: Store };
 export function getStore(): Store {
   if (!g2.__simStore) {
-    g2.__simStore = hasSupabase() ? new ResilientStore() : hasNetlifyBlobs() ? new BlobsStore() : new MemoryStore();
+    g2.__simStore = new ResilientStore();
     if (!hasSupabase() && !hasNetlifyBlobs()) console.warn("[store] Supabase não configurado: usando memória (dados não persistem).");
   }
   return g2.__simStore;
 }
 export const storageMode = (): "supabase" | "blobs" | "memory" => {
-  const s = g2.__simStore;
-  if (s instanceof ResilientStore) return s.degraded ? (hasNetlifyBlobs() ? "blobs" : "memory") : "supabase";
-  if (hasSupabase()) return "supabase";
-  return hasNetlifyBlobs() ? "blobs" : "memory";
+  const s = getStore();
+  return s instanceof ResilientStore ? s.mode : "memory";
 };
