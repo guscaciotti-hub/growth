@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useProject } from "@/store/useProject";
-import { TopBar } from "@/components/hud/TopBar";
+import { TopBar, MobileActions } from "@/components/hud/TopBar";
 import { SidePanel } from "@/components/hud/SidePanel";
 import { PersonaCard } from "@/components/hud/PersonaCard";
 import { EventLog } from "@/components/hud/EventLog";
@@ -48,7 +48,7 @@ export function ProjectView({ id }: { id: string }) {
 
   return (
     <main className="relative flex h-dvh w-full flex-col overflow-hidden lg:block">
-      <div className="relative h-[46vh] w-full shrink-0 lg:absolute lg:inset-0 lg:h-full">
+      <div className="relative h-[38vh] w-full shrink-0 lg:absolute lg:inset-0 lg:h-full">
         <CityScene />
         <TopBar />
         <PersonaCard />
@@ -62,6 +62,7 @@ export function ProjectView({ id }: { id: string }) {
           <span className="opacity-70">· arraste para girar · clique numa pessoa</span>
         </div>
       </div>
+      <MobileActions />
       <div className="relative z-20 flex min-h-0 flex-1 p-3 lg:absolute lg:bottom-4 lg:left-4 lg:top-[88px] lg:p-0">
         <SidePanel />
       </div>

@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Lightbulb, MapPin, Tag, Wallet, Rocket, Wand2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Lightbulb, MapPin, Tag, Wallet, Rocket, Wand2, Trash2 } from "lucide-react";
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui";
 import { BusinessInputSchema, emptyBusinessInput, type BusinessInput } from "@/lib/types";
 import { brl } from "@/lib/format";
@@ -40,10 +40,56 @@ const EXAMPLE: BusinessInput = {
 
 type Errors = Partial<Record<string, string>>;
 
+const DRAFT_KEY = "founder-city:draft";
+
+function loadDraft(): { step: number; data: BusinessInput } | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { step: number; data: BusinessInput };
+    if (!j?.data || typeof j.step !== "number") return null;
+    return { step: Math.min(STEPS.length - 1, Math.max(0, j.step)), data: { ...emptyBusinessInput(), ...j.data } };
+  } catch {
+    return null;
+  }
+}
+
 export function Wizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<BusinessInput>(emptyBusinessInput);
+  const [restored, setRestored] = useState(false);
+  const hydrated = useRef(false);
+
+  // restaura o rascunho (celular descarrega a aba ao trocar de app)
+  useEffect(() => {
+    const d = loadDraft();
+    if (d) {
+      setData(d.data);
+      setStep(d.step);
+      setRestored(Boolean(d.data.name || d.data.pitch));
+    }
+    hydrated.current = true;
+  }, []);
+  // salva a cada mudança
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, data }));
+    } catch {
+      /* sem espaço */
+    }
+  }, [step, data]);
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* ignora */
+    }
+    setData(emptyBusinessInput());
+    setStep(0);
+    setRestored(false);
+  };
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -107,6 +153,11 @@ export function Wizard() {
       id ??= crypto.randomUUID();
       const now = new Date().toISOString();
       saveLocal({ project: { id, name: data.name, status: "draft", input: data, created_at: now, updated_at: now }, analysis: null, personas: [], runs: [] });
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* ignora */
+      }
       router.push(`/projeto/${id}`);
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
@@ -118,6 +169,12 @@ export function Wizard() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
+      {restored && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent/8 px-3 py-2 text-[12.5px]">
+          <span>Rascunho recuperado: continue de onde parou.</span>
+          <button type="button" onClick={clearDraft} className="inline-flex items-center gap-1 text-muted hover:text-reject"><Trash2 className="size-3.5" /> Começar do zero</button>
+        </div>
+      )}
       <ol className="mb-6 grid grid-cols-5 gap-1.5">
         {STEPS.map((s, i) => (
           <li key={s.key}>
