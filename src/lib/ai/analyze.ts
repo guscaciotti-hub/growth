@@ -65,15 +65,17 @@ export async function analyzeBusiness(input: BusinessInput, research: string | n
     await sleep(1200);
     return { analysis: mockAnalysis(input), usage: emptyUsage("demo") };
   }
-  const { data, raw } = await structured({
+  const { data, raw, repairs } = await structured({
     model: MODEL_ANALYSIS,
     system: ANALYST_SYSTEM,
     prompt: analysisPrompt(input, research),
     schema: AnalysisSchema,
     effort: "high",
-    maxTokens: 32000,
+    maxTokens: 64000,
   });
-  return { analysis: normalizeAnalysis(data), usage: usageOf(raw, MODEL_ANALYSIS) };
+  let usage = usageOf(raw, MODEL_ANALYSIS);
+  for (const r of repairs ?? []) if (r !== raw) usage = addUsage(usage, usageOf(r, MODEL_ANALYSIS));
+  return { analysis: normalizeAnalysis(data), usage };
 }
 
 function normalizeAnalysis(a: Analysis): Analysis {

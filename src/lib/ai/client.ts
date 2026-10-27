@@ -46,8 +46,10 @@ export async function structured<T extends z.ZodTypeAny>(opts: {
   schema: T;
   effort: "low" | "medium" | "high";
   maxTokens: number;
-}): Promise<{ data: z.infer<T>; raw: Anthropic.Beta.BetaMessage }> {
+}): Promise<{ data: z.infer<T>; raw: Anthropic.Beta.BetaMessage; repairs?: Anthropic.Beta.BetaMessage[] }> {
   const client = anthropic();
+  let firstText: string | null = null;
+  let firstRaw: Anthropic.Beta.BetaMessage | null = null;
   try {
     const res = await client.beta.messages.parse({
       model: opts.model,
@@ -61,31 +63,78 @@ export async function structured<T extends z.ZodTypeAny>(opts: {
     if (res.stop_reason === "refusal") throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
     if (res.parsed_output) return { data: res.parsed_output as z.infer<T>, raw: res };
     // sem parsed_output: tenta extrair do texto
-    const parsed = parseJsonText(textOf(res.content as Array<{ type: string; text?: string }>), opts.schema);
-    if (parsed) return { data: parsed, raw: res };
-    throw new Error("A resposta não veio no formato esperado. Tente novamente.");
+    firstText = textOf(res.content as Array<{ type: string; text?: string }>);
+    firstRaw = res;
+    const parsed = parseJsonText(firstText, opts.schema);
+    if (parsed.data) return { data: parsed.data, raw: res };
+    console.warn("[ai] saída estruturada sem parsed_output", { stop_reason: res.stop_reason, issues: parsed.issues?.slice(0, 5) });
   } catch (err) {
-    if (!(err instanceof Anthropic.BadRequestError) || !/grammar is too large|too large/i.test(err.message)) throw err;
+    if (err instanceof RefusalError) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    const grammar = err instanceof Anthropic.BadRequestError && /grammar is too large|too large/i.test(msg);
+    if (!grammar && !(err instanceof Error && /parse|JSON|format/i.test(msg) && !(err instanceof Anthropic.APIError))) throw err;
+    console.warn("[ai] saída estruturada indisponível, usando JSON livre:", msg.slice(0, 200));
   }
-  // Caminho alternativo: JSON livre guiado pelo JSON Schema
+
   const jsonSchema = JSON.stringify(z.toJSONSchema(opts.schema));
-  const res = await client.beta.messages.create({
-    model: opts.model,
-    max_tokens: opts.maxTokens,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: opts.effort },
-    system: `${opts.system}\n\nFORMATO DE SAÍDA: responda somente com um objeto JSON válido (sem markdown, sem comentários, sem texto antes ou depois) que obedeça exatamente a este JSON Schema:\n${jsonSchema}`,
-    messages: [{ role: "user", content: opts.prompt }],
-  });
-  if (res.stop_reason === "refusal") throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
-  const text = textOf(res.content as Array<{ type: string; text?: string }>);
-  const parsed = parseJsonText(text, opts.schema);
-  if (!parsed) throw new Error("O modelo devolveu JSON inválido para este esquema. Tente novamente.");
-  return { data: parsed, raw: res };
+  const formatRule = `FORMATO DE SAÍDA: responda somente com um objeto JSON válido (sem markdown, sem comentários, sem texto antes ou depois) que obedeça exatamente a este JSON Schema:\n${jsonSchema}`;
+
+  // Caminho alternativo: JSON livre guiado pelo JSON Schema (pulado se já temos um texto da 1ª tentativa)
+  let text = firstText;
+  let raw = firstRaw;
+  if (text === null) {
+    const res = await client.beta.messages.create({
+      model: opts.model,
+      max_tokens: opts.maxTokens,
+      betas: [FALLBACK_BETA],
+      fallbacks: "default",
+      output_config: { effort: opts.effort },
+      system: `${opts.system}\n\n${formatRule}`,
+      messages: [{ role: "user", content: opts.prompt }],
+    });
+    if (res.stop_reason === "refusal") throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
+    text = textOf(res.content as Array<{ type: string; text?: string }>);
+    raw = res;
+    const parsed = parseJsonText(text, opts.schema);
+    if (parsed.data) return { data: parsed.data, raw: res };
+    console.warn("[ai] JSON livre inválido", { stop_reason: res.stop_reason, chars: text.length, issues: parsed.issues?.slice(0, 5), head: text.slice(0, 300) });
+  }
+
+  // Reparo: devolve ao modelo o JSON inválido + erros de validação e pede a versão corrigida (barato, sem pesquisa)
+  const repairs: Anthropic.Beta.BetaMessage[] = [];
+  let current = text ?? "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const parsedBefore = parseJsonText(current, opts.schema);
+    const issues = parsedBefore.issues ?? ["JSON incompleto ou malformado (provavelmente cortado)"];
+    const truncated = raw?.stop_reason === "max_tokens" || !/\}\s*$/.test(current.trim());
+    const res = await client.beta.messages.create({
+      model: opts.model,
+      max_tokens: opts.maxTokens,
+      betas: [FALLBACK_BETA],
+      fallbacks: "default",
+      output_config: { effort: "low" },
+      system: `${opts.system}\n\n${formatRule}`,
+      messages: [
+        { role: "user", content: opts.prompt },
+        { role: "assistant", content: current.slice(0, 120_000) || "{}" },
+        {
+          role: "user",
+          content: `Sua resposta anterior ${truncated ? "foi cortada antes do fim e/ou" : ""} não passou na validação do esquema. Erros encontrados:\n- ${issues.slice(0, 25).join("\n- ")}\n\nReescreva a resposta COMPLETA como um único objeto JSON válido que obedeça ao esquema (mantenha o conteúdo e corrija só o que está errado; preencha o que faltou). Sem texto fora do JSON.`,
+        },
+      ],
+    });
+    repairs.push(res);
+    if (res.stop_reason === "refusal") throw new RefusalError(res.stop_details?.category ?? null, res.stop_details?.explanation ?? undefined);
+    current = textOf(res.content as Array<{ type: string; text?: string }>);
+    raw = res;
+    const parsed = parseJsonText(current, opts.schema);
+    if (parsed.data) return { data: parsed.data, raw: raw!, repairs };
+    console.warn("[ai] reparo falhou", { attempt, stop_reason: res.stop_reason, issues: parsed.issues?.slice(0, 5) });
+  }
+  throw new Error("O modelo não conseguiu devolver a análise no formato esperado, mesmo após correção automática. Clique em Analisar de novo: a pesquisa já feita será reaproveitada.");
 }
 
-function parseJsonText<T extends z.ZodTypeAny>(text: string, schema: T): z.infer<T> | null {
+function parseJsonText<T extends z.ZodTypeAny>(text: string, schema: T): { data: z.infer<T> | null; issues?: string[] } {
   const candidates: string[] = [];
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) candidates.push(fenced[1]);
@@ -93,13 +142,15 @@ function parseJsonText<T extends z.ZodTypeAny>(text: string, schema: T): z.infer
   const last = text.lastIndexOf("}");
   if (first >= 0 && last > first) candidates.push(text.slice(first, last + 1));
   candidates.push(text);
+  let issues: string[] | undefined;
   for (const c of candidates) {
     try {
       const r = schema.safeParse(JSON.parse(c));
-      if (r.success) return r.data;
-    } catch {
-      /* tenta o próximo */
+      if (r.success) return { data: r.data };
+      issues = r.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`);
+    } catch (e) {
+      issues ??= [`JSON malformado: ${e instanceof Error ? e.message : String(e)}`];
     }
   }
-  return null;
+  return { data: null, issues };
 }

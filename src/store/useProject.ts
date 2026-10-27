@@ -27,7 +27,7 @@ type State = {
   cameraFocus: "hq" | "overview" | number;
   usdBrl: { rate: number; at: string | null; source: string };
   load: (id: string) => Promise<void>;
-  analyze: (opts?: { skipResearch?: boolean }) => Promise<void>;
+  analyze: (opts?: { skipResearch?: boolean; forceResearch?: boolean }) => Promise<void>;
   generatePersonas: () => Promise<void>;
   simulate: (scenario: ScenarioConfig) => Promise<void>;
   selectPersona: (idx: number | null) => void;
@@ -98,7 +98,7 @@ export const useProject = create<State>((set, get) => ({
     set({
       bundle,
       mode,
-      research: bundle.analysis?.research ?? null,
+      research: bundle.research_draft?.text ?? bundle.analysis?.research ?? null,
       activeRunId: lastDone?.id ?? null,
       loading: false,
       panel: lastDone ? "simulation" : "overview",
@@ -113,14 +113,19 @@ export const useProject = create<State>((set, get) => ({
     try {
       const input = b.project.input;
       let research: string | null = null;
-      if (!opts?.skipResearch) {
+      const reusable = get().research;
+      if (!opts?.skipResearch && reusable && !opts?.forceResearch) {
+        research = reusable;
+        pushLog(set, { kind: "info", text: "Pesquisa de mercado já feita: reaproveitada sem custo." });
+      } else if (!opts?.skipResearch) {
         set({ statusMessage: "Pesquisando mercado, concorrentes e região…", progress: 0.12 });
         try {
           const r = await postJSON<{ research: string }>("/api/ai/research", { input });
           addCost(set, r.cost);
           research = r.research;
           set({ research, ...(r.mode ? { mode: r.mode.ai === "live" ? "live" : "demo" } : {}) });
-          pushLog(set, { kind: "info", text: "Pesquisa de mercado concluída." });
+          update(set, (bundle) => ({ ...bundle, research_draft: { text: r.research, created_at: new Date().toISOString() } }));
+          pushLog(set, { kind: "info", text: "Pesquisa de mercado concluída e guardada." });
         } catch (e) {
           pushLog(set, { kind: "info", text: `Pesquisa indisponível (${e instanceof Error ? e.message : "erro"}); seguindo sem ela.` });
         }
@@ -132,6 +137,7 @@ export const useProject = create<State>((set, get) => ({
       update(set, (bundle) => ({
         ...bundle,
         analysis: { id: crypto.randomUUID(), data: analysis, research, model: null, created_at: new Date().toISOString() },
+        research_draft: null,
         project: { ...bundle.project, status: "analyzed", updated_at: new Date().toISOString() },
       }));
       if (a.mode) set({ mode: a.mode.ai === "live" ? "live" : "demo" });

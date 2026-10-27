@@ -43,9 +43,16 @@ export function OverviewPanel() {
             </>
           )}
         </div>
+        {research && (
+          <div className="rounded-xl border border-buy/30 bg-buy/8 p-3 text-[12px]">
+            <div className="font-semibold text-buy">Pesquisa de mercado já feita e guardada</div>
+            <div className="mt-0.5 text-muted">Ao clicar em {input.stage === "existente" ? "Diagnosticar" : "Analisar"}, ela é reaproveitada sem custo. <button onClick={() => analyze({ forceResearch: true })} disabled={phase !== "idle"} className="text-accent hover:underline">Refazer pesquisa</button> · <button onClick={() => setShowResearch((v) => !v)} className="text-accent hover:underline">{showResearch ? "ocultar" : "ver"}</button></div>
+            {showResearch && <pre className="scroll-thin mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-white/70 p-3 text-[11px] leading-relaxed text-fg/80">{research}</pre>}
+          </div>
+        )}
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => analyze()} loading={phase === "analyzing"} disabled={phase !== "idle"}>{input.stage === "existente" ? "Diagnosticar com pesquisa web" : "Analisar com pesquisa web"}</Button>
-          <Button variant="ghost" onClick={() => analyze({ skipResearch: true })} disabled={phase !== "idle"} title="Mais rápido, sem buscar dados na web">Rápida</Button>
+          <Button className="flex-1" onClick={() => analyze()} loading={phase === "analyzing"} disabled={phase !== "idle"}>{input.stage === "existente" ? (research ? "Diagnosticar (usa a pesquisa guardada)" : "Diagnosticar com pesquisa web") : research ? "Analisar (usa a pesquisa guardada)" : "Analisar com pesquisa web"}</Button>
+          {!research && <Button variant="ghost" onClick={() => analyze({ skipResearch: true })} disabled={phase !== "idle"} title="Mais rápido, sem buscar dados na web">Rápida</Button>}
         </div>
       </div>
     );

@@ -346,6 +346,8 @@ export type ProjectBundle = {
   personas: Persona[];
   runs: Run[];
   costs?: import("./pricing").CostEntry[];
+  /** Pesquisa web já paga, guardada para ser reaproveitada se a análise falhar ou for refeita. */
+  research_draft?: { text: string; created_at: string } | null;
 };
 
 export type ProjectListItem = Project & { score: number | null; runs: number };
